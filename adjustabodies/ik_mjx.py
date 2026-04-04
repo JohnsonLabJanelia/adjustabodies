@@ -379,6 +379,7 @@ def batch_ik_mjx(m, frames, site_ids, config=None):
 
     all_qpos = np.zeros((N, nq), dtype=np.float64)
     all_residuals = np.zeros(N, dtype=np.float64)
+    bs = config.batch_size
 
     # Warmup JIT compilation (must match batch_size for scan mode's static shapes)
     print(f"[ik_mjx] Compiling ({'scan' if config.use_scan else 'step'} mode)...")
@@ -392,7 +393,6 @@ def batch_ik_mjx(m, frames, site_ids, config=None):
 
     # Process in batches
     t0 = time.time()
-    bs = config.batch_size
     n_batches = (N + bs - 1) // bs
     frames_done = 0
 
