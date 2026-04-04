@@ -31,6 +31,7 @@ dev = [
 [project.scripts]
 adjustabodies-fit = "adjustabodies.cli:fit_cli"
 adjustabodies-ik = "adjustabodies.cli:ik_cli"
+adjustabodies-ik-mjx = "adjustabodies.cli:ik_mjx_cli"
 
 [tool.setuptools.packages.find]
 include = ["adjustabodies*"]
