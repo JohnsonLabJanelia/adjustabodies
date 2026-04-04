@@ -380,13 +380,15 @@ def batch_ik_mjx(m, frames, site_ids, config=None):
     all_qpos = np.zeros((N, nq), dtype=np.float64)
     all_residuals = np.zeros(N, dtype=np.float64)
 
-    # Warmup JIT compilation
-    print("[ik_mjx] Compiling (first batch triggers JIT)...")
-    warmup_size = min(4, config.batch_size)
-    dummy_kp = jnp.zeros((warmup_size, 24, 3))
-    dummy_valid = jnp.ones((warmup_size, 24))
+    # Warmup JIT compilation (must match batch_size for scan mode's static shapes)
+    print(f"[ik_mjx] Compiling ({'scan' if config.use_scan else 'step'} mode)...")
+    import jax
+    t_compile = time.time()
+    dummy_kp = jnp.zeros((bs, 24, 3))
+    dummy_valid = jnp.ones((bs, 24))
     _ = solve_batch(dummy_kp, dummy_valid)
-    print("[ik_mjx] Compilation complete.")
+    jax.block_until_ready(_[0])
+    print(f"[ik_mjx] Compiled in {time.time() - t_compile:.1f}s")
 
     # Process in batches
     t0 = time.time()
@@ -408,6 +410,7 @@ def batch_ik_mjx(m, frames, site_ids, config=None):
             valid_batch = np.concatenate([valid_batch, np.zeros((bs - actual, 24), dtype=np.float32)])
 
         qpos_batch, res_batch = solve_batch(jnp.array(kp_batch), jnp.array(valid_batch))
+        jax.block_until_ready(qpos_batch)
 
         all_qpos[start:end] = np.array(qpos_batch[:actual])
         all_residuals[start:end] = np.array(res_batch[:actual]) * 1000.0  # m → mm

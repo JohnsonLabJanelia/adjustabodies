@@ -60,22 +60,21 @@ if gpu: print(f'GPU: {gpu[0]}')
     pip install -e "$REPO_DIR" --quiet 2>&1 | tail -3
 
     echo ""
-    echo "--- Test 1: Quick validation (20 frames, 500 iters) ---"
-    python3 "$REPO_DIR/scripts/compare_ik.py" \
-        --data-dir "$DATA_DIR" \
-        --model "$MODEL" \
-        --max-frames 20 \
-        --ik-iters 500 \
-        --lr 0.01
-
-    echo ""
-    echo "--- Test 2: Full tiny_project (all frames, 1000 iters) ---"
+    echo "--- Test 1: MJX-only scan mode throughput (1338 frames, 1000 iters) ---"
     python3 "$REPO_DIR/scripts/compare_ik.py" \
         --data-dir "$DATA_DIR" \
         --model "$MODEL" \
         --ik-iters 1000 \
         --lr 0.01 \
-        --reference-csv "$DATA_DIR/qpos_export.csv"
+        --mjx-only
+
+    echo ""
+    echo "--- Test 2: Full CPU vs MJX comparison (1338 frames, 1000 iters) ---"
+    python3 "$REPO_DIR/scripts/compare_ik.py" \
+        --data-dir "$DATA_DIR" \
+        --model "$MODEL" \
+        --ik-iters 1000 \
+        --lr 0.01
 
     echo ""
     echo "=== Done ==="
