@@ -1,3 +1,0 @@
-[console_scripts]
-adjustabodies-fit = adjustabodies.cli:fit_cli
-adjustabodies-ik = adjustabodies.cli:ik_cli
