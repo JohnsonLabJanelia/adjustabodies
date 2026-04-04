@@ -105,5 +105,14 @@ def save_fitted_model(m, output_path: str, metadata: dict = None):
 
     if metadata:
         json_path = output_path.replace('.mjb', '.json')
+        # Convert numpy/jax scalars to Python floats for JSON
+        def _convert(obj):
+            if isinstance(obj, dict):
+                return {k: _convert(v) for k, v in obj.items()}
+            if isinstance(obj, (list, tuple)):
+                return [_convert(v) for v in obj]
+            if hasattr(obj, 'item'):  # numpy/jax scalar
+                return obj.item()
+            return obj
         with open(json_path, 'w') as f:
-            json.dump(metadata, f, indent=2)
+            json.dump(_convert(metadata), f, indent=2)
