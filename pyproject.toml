@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adjustabodies"
+version = "0.1.0"
+description = "MuJoCo body model fitting: resize, calibrate, and batch IK for behavioral neuroscience"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Johnson Lab", email = "johnsonr@janelia.hhmi.org"},
+]
+dependencies = [
+    "mujoco>=3.0",
+    "numpy",
+]
+
+[project.optional-dependencies]
+mjx = [
+    "mujoco-mjx",
+    "jax[cuda12]",
+    "optax",
+]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[project.scripts]
+adjustabodies-fit = "adjustabodies.cli:fit_cli"
+adjustabodies-ik = "adjustabodies.cli:ik_cli"
+
+[tool.setuptools.packages.find]
+include = ["adjustabodies*"]

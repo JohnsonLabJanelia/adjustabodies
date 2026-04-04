@@ -1,0 +1,2 @@
+*.mjb filter=lfs diff=lfs merge=lfs -text
+*.skn filter=lfs diff=lfs merge=lfs -text
