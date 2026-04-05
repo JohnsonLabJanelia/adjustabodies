@@ -41,6 +41,7 @@ def parse_qpos_csv(csv_path, max_residual_mm=None):
     t0 = time.time()
     n_lines = 0
 
+    # TODO: replace with pandas.read_csv for 5-10x speedup on multi-GB files
     with open(csv_path) as f:
         for line in f:
             line = line.strip()

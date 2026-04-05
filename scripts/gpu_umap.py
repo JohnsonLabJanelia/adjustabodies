@@ -200,8 +200,11 @@ def main():
     print("SUMMARY")
     print(f"{'='*60}")
     for name, info in all_info.items():
-        print(f"  {name:12s}: PCA {info['variance_explained']:.1%} var, "
-              f"UMAP {info['t_umap']:.0f}s, total {info['t_total']:.0f}s")
+        if 'error' in info:
+            print(f"  {name:12s}: SKIPPED ({info['error']})")
+        else:
+            print(f"  {name:12s}: PCA {info['variance_explained']:.1%} var, "
+                  f"UMAP {info['t_umap']:.0f}s, total {info['t_total']:.0f}s")
     print()
 
 

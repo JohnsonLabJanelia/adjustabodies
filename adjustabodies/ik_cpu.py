@@ -12,7 +12,8 @@ from typing import List, Tuple
 def solve_ik_frame(m: mujoco.MjModel, d: mujoco.MjData,
                     targets: List[Tuple[int, np.ndarray]],
                     max_iters: int = 1000, lr: float = 0.001,
-                    beta: float = 0.99, warm_start: bool = False):
+                    beta: float = 0.99, warm_start: bool = False,
+                    momentum: np.ndarray = None):
     """Solve IK for a single frame.
 
     Args:
@@ -23,12 +24,18 @@ def solve_ik_frame(m: mujoco.MjModel, d: mujoco.MjData,
         lr: learning rate
         beta: momentum coefficient
         warm_start: if False, reset qpos and align root to target centroid
+        momentum: optional [nv] momentum buffer (carried between warm-start calls)
+
+    Returns:
+        qpos copy. If momentum was passed, it is updated in place.
     """
     nv = m.nv
     jacp = np.zeros((3, nv))
-    update = np.zeros(nv)
+    if momentum is None:
+        momentum = np.zeros(nv)
 
     if not warm_start:
+        momentum[:] = 0
         mujoco.mj_resetData(m, d)
         # Root alignment: center model on target centroid
         if targets:
@@ -47,8 +54,8 @@ def solve_ik_frame(m: mujoco.MjModel, d: mujoco.MjData,
             jacp[:] = 0
             mujoco.mj_jacSite(m, d, jacp, None, sid)
             grad += 2.0 * jacp.T @ (d.site_xpos[sid] - tgt)
-        update = beta * update + grad
-        step = -lr * update
+        momentum[:] = beta * momentum + grad
+        step = -lr * momentum
         mujoco.mj_integratePos(m, d.qpos, step, 1.0)
         mujoco.mj_fwdPosition(m, d)
 
@@ -106,20 +113,22 @@ def batch_ik_cpu_trial(m: mujoco.MjModel, frames, site_ids: List[int],
     N = len(frames)
     all_qpos = np.zeros((N, m.nq), dtype=np.float64)
     residuals = np.full(N, np.nan, dtype=np.float64)
+    mom = np.zeros(m.nv)  # momentum buffer carried across warm-start frames
 
     for i, (kp_mj, valid) in enumerate(frames):
         targets = [(site_ids[k], kp_mj[k])
                     for k in range(24) if valid[k] > 0.5 and site_ids[k] >= 0]
         if not targets:
-            # No valid keypoints — reset warm-start
+            # No valid keypoints — reset warm-start and momentum
             mujoco.mj_resetData(m, d)
+            mom[:] = 0
             continue
 
         iters = max_iters if i == 0 else warm_iters
-        ws = (i > 0)  # warm-start from previous frame's qpos (still in d)
+        ws = (i > 0)
 
         all_qpos[i] = solve_ik_frame(m, d, targets, max_iters=iters,
-                                      warm_start=ws, **kwargs)
+                                      warm_start=ws, momentum=mom, **kwargs)
 
         # Compute residual
         err_sq = sum(np.sum((d.site_xpos[sid] - tgt) ** 2)

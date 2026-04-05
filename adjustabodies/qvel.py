@@ -42,9 +42,12 @@ def compute_qvel(m: mujoco.MjModel, qpos_series: np.ndarray,
     for t in range(1, T):
         mujoco.mj_differentiatePos(m, qvel[t], dt, qpos_series[t-1], qpos_series[t])
 
-    # First frame: copy from second (avoid zero spike)
+    # First frame: use forward difference (same as frame 1, but computed from 0→1)
+    # This avoids a zero spike without duplicating frame 1's velocity.
+    # Already computed: qvel[1] = diff(qpos[0], qpos[1]) / dt, so qvel[0] = qvel[1]
+    # is the best we can do without a frame before frame 0.
     if T > 1:
-        qvel[0] = qvel[1]
+        qvel[0] = qvel[1]  # forward difference = backward difference at frame 1
 
     # Optional Savitzky-Golay smoothing
     if smooth_window > 0 and T > smooth_window:
