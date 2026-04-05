@@ -150,9 +150,13 @@ def main():
         # [20:24] fps
         # [24:26] num_keypoints
         # [26:32] padding
-        f.write(struct.pack('<IIIIIH', MAGIC, FORMAT_VERSION, n_trials, num_fields, 0, 180))
+        # Header: 32 bytes
+        # [0:4] magic, [4:8] version, [8:12] num_trials, [12:16] num_fields,
+        # [16:20] header_size, [20:24] fps, [24:26] num_keypoints, [26:32] padding
+        f.write(struct.pack('<IIIIII', MAGIC, FORMAT_VERSION, n_trials, num_fields, 0, 180))
         f.write(struct.pack('<H', num_kp))
-        f.write(b'\x00' * 4)  # padding to 32 bytes
+        f.write(b'\x00' * 6)  # padding to 32 bytes
+        assert f.tell() == 32
 
         # Field descriptors
         for name, epf, esz, dtype in fields:
