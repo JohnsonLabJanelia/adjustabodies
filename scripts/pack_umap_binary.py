@@ -124,6 +124,21 @@ def main():
         total_frames = int(trial_lengths.sum())
         print(f"  Rebuilt: {n_trials} trials, {total_frames} frames")
 
+    # Load full qpos for Green app visualization
+    qpos_full_path = os.path.join(args.umap_dir, 'qpos_full.npy')
+    has_qpos_full = os.path.exists(qpos_full_path)
+    nq = 0
+    if has_qpos_full:
+        qpos_full = np.load(qpos_full_path).astype(np.float32)
+        nq = qpos_full.shape[1]
+        print(f"  qpos_full: {qpos_full.shape} (nq={nq})")
+        if valid_mask is not None and len(qpos_full) < total_frames:
+            full = np.zeros((total_frames, nq), dtype=np.float32)
+            full[valid_mask] = qpos_full
+            qpos_full = full
+    else:
+        print(f"  qpos_full: NOT FOUND (skipping)")
+
     # ── Define fields ───────────────────────────────────────────
     fields = [
         ('umap_qpos',     3, 4, DTYPE_FLOAT32),
@@ -131,6 +146,8 @@ def main():
         ('umap_combined', 3, 4, DTYPE_FLOAT32),
         ('com_speed',     1, 4, DTYPE_FLOAT32),
     ]
+    if has_qpos_full:
+        fields.append(('qpos', nq, 4, DTYPE_FLOAT32))
     num_fields = len(fields)
     bytes_per_frame = sum(epf * esz for _, epf, esz, _ in fields)
     num_kp = 0  # not keypoint data
@@ -187,6 +204,8 @@ def main():
                 f.write(umap_qvel[idx].tobytes())       # 12 bytes
                 f.write(umap_combined[idx].tobytes())    # 12 bytes
                 f.write(struct.pack('<f', com_speed[idx]))  # 4 bytes
+                if has_qpos_full:
+                    f.write(qpos_full[idx].tobytes())   # nq*4 bytes
 
             if (i + 1) % 500 == 0:
                 print(f"  {i+1}/{n_trials} trials...")

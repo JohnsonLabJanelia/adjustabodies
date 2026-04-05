@@ -167,6 +167,7 @@ def main():
     print(f"\nComputing qvel (fps={args.fps}, smooth={args.smooth_window})...")
     t0 = time.time()
 
+    all_qpos_full = []   # full nq qpos for Green app visualization
     all_qpos_hinges = []
     all_qvel_hinges = []
     all_com_speed = []
@@ -223,6 +224,7 @@ def main():
         # Extract hinge features
         feats = extract_hinge_features(qpos_series, qvel_series, m)
 
+        all_qpos_full.append(qpos_series.astype(np.float32))
         all_qpos_hinges.append(feats['qpos_hinges'])
         all_qvel_hinges.append(feats['qvel_hinges'])
         all_com_speed.append(feats['com_speed'])
@@ -247,6 +249,7 @@ def main():
 
     # ── Concatenate ─────────────────────────────────────────────
     print("Concatenating...")
+    qpos_full = np.concatenate(all_qpos_full)
     qpos_hinges = np.concatenate(all_qpos_hinges)
     qvel_hinges = np.concatenate(all_qvel_hinges)
     com_speed = np.concatenate(all_com_speed)
@@ -268,6 +271,7 @@ def main():
     # ── Save ────────────────────────────────────────────────────
     print(f"\nSaving to {args.output_dir}/")
 
+    np.save(os.path.join(args.output_dir, 'qpos_full.npy'), qpos_full)
     np.save(os.path.join(args.output_dir, 'qpos_hinges.npy'), qpos_hinges)
     np.save(os.path.join(args.output_dir, 'qvel_hinges.npy'), qvel_hinges)
     np.save(os.path.join(args.output_dir, 'com_speed.npy'), com_speed)
