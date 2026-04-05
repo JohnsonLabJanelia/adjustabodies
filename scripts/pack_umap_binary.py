@@ -188,24 +188,28 @@ def main():
         index_offset = f.tell()
         f.write(b'\x00' * (n_trials * INDEX_ENTRY_SIZE))
 
-        # Per-trial data
+        # Per-trial data: contiguous field blocks (NOT interleaved per frame)
+        # Layout: [all frames of field 0][all frames of field 1]...
+        # This matches TrajReader's access: offset + num_frames * byte_offset_per_frame
         trial_offsets = []
         for i in range(n_trials):
             start = int(trial_starts[i])
             length = int(trial_lengths[i])
+            end = start + length
 
-            trial_data_offset = f.tell()
-            trial_offsets.append(trial_data_offset)
+            trial_offsets.append(f.tell())
 
-            # Interleave fields per frame (matching TrajReader's layout)
-            for frame in range(length):
-                idx = start + frame
-                f.write(umap_qpos[idx].tobytes())      # 12 bytes
-                f.write(umap_qvel[idx].tobytes())       # 12 bytes
-                f.write(umap_combined[idx].tobytes())    # 12 bytes
-                f.write(struct.pack('<f', com_speed[idx]))  # 4 bytes
-                if has_qpos_full:
-                    f.write(qpos_full[idx].tobytes())   # nq*4 bytes
+            # Field 0: umap_qpos (3 × float32)
+            f.write(umap_qpos[start:end].tobytes())
+            # Field 1: umap_qvel (3 × float32)
+            f.write(umap_qvel[start:end].tobytes())
+            # Field 2: umap_combined (3 × float32)
+            f.write(umap_combined[start:end].tobytes())
+            # Field 3: com_speed (1 × float32)
+            f.write(com_speed[start:end].tobytes())
+            # Field 4: qpos (nq × float32, optional)
+            if has_qpos_full:
+                f.write(qpos_full[start:end].tobytes())
 
             if (i + 1) % 500 == 0:
                 print(f"  {i+1}/{n_trials} trials...")

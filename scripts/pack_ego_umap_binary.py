@@ -126,24 +126,30 @@ def main():
         index_offset = f.tell()
         f.write(b'\x00' * (n_trials * INDEX_ENTRY_SIZE))
 
-        # Per-trial interleaved data
+        # Per-trial data: contiguous field blocks (NOT interleaved per frame)
+        # Layout: [all frames of field 0][all frames of field 1]...
+        # This matches TrajReader's access: offset + num_frames * byte_offset_per_frame
         trial_offsets = []
         for i in range(n_trials):
             start = int(trial_starts[i])
             length = int(trial_lengths[i])
+            end = start + length
 
             trial_offsets.append(f.tell())
 
-            for frame in range(length):
-                idx = start + frame
-                ego = umap_ego[idx]
-                f.write(ego.tobytes())       # umap_ego: 12 bytes
-                f.write(ego.tobytes())       # umap_qpos: 12 bytes (copy)
-                f.write(ego.tobytes())       # umap_qvel: 12 bytes (copy)
-                f.write(ego.tobytes())       # umap_combined: 12 bytes (copy)
-                f.write(struct.pack('<f', com_speed[idx]))  # 4 bytes
-                if has_animals:
-                    f.write(struct.pack('B', animal_ids[idx]))  # 1 byte
+            # Field 0: umap_ego (3 × float32)
+            f.write(umap_ego[start:end].tobytes())
+            # Field 1: umap_qpos (copy of ego)
+            f.write(umap_ego[start:end].tobytes())
+            # Field 2: umap_qvel (copy of ego)
+            f.write(umap_ego[start:end].tobytes())
+            # Field 3: umap_combined (copy of ego)
+            f.write(umap_ego[start:end].tobytes())
+            # Field 4: com_speed (1 × float32)
+            f.write(com_speed[start:end].tobytes())
+            # Field 5: animal_id (1 × uint8, optional)
+            if has_animals:
+                f.write(animal_ids[start:end].tobytes())
 
             if (i + 1) % 500 == 0:
                 print(f"  {i+1}/{n_trials} trials...")
