@@ -57,7 +57,15 @@ def main():
     total_frames = int(trial_lengths.sum())
     print(f"  {n_trials} trials, {total_frames} total frames")
 
-    # Load embeddings (optional — fill with zeros if missing)
+    # Load valid mask (UMAP may have filtered NaN frames)
+    valid_mask_path = os.path.join(args.umap_dir, 'umap_valid_mask.npy')
+    valid_mask = None
+    if os.path.exists(valid_mask_path):
+        valid_mask = np.load(valid_mask_path)
+        n_valid = int(valid_mask.sum())
+        print(f"  Valid mask: {n_valid}/{total_frames} frames ({100*n_valid/total_frames:.1f}%)")
+
+    # Load embeddings — if shorter than total_frames, expand using valid_mask
     def load_or_zeros(name, dims):
         path = os.path.join(args.umap_dir, f'umap_{name}.npy')
         if os.path.exists(path):
@@ -68,6 +76,11 @@ def main():
                 arr = np.concatenate([arr, np.zeros((arr.shape[0], dims - arr.shape[1]), dtype=np.float32)], axis=1)
             elif arr.shape[1] > dims:
                 arr = arr[:, :dims]
+            # Expand to full length if valid_mask was used
+            if valid_mask is not None and len(arr) < total_frames:
+                full = np.zeros((total_frames, dims), dtype=np.float32)
+                full[valid_mask] = arr
+                return full
             return arr
         else:
             print(f"  umap_{name}: NOT FOUND (filling with zeros)")

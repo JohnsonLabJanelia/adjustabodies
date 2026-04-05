@@ -131,7 +131,20 @@ def main():
     print(f"  qpos: {qpos.shape} ({qpos.nbytes/1e6:.0f} MB)")
     print(f"  qvel: {qvel.shape} ({qvel.nbytes/1e6:.0f} MB)")
 
+    # Filter out NaN rows (frames where IK had no valid keypoints)
+    N_raw = qpos.shape[0]
+    valid_mask = np.isfinite(qpos).all(axis=1) & np.isfinite(qvel).all(axis=1)
+    n_invalid = int((~valid_mask).sum())
+    if n_invalid > 0:
+        print(f"  Filtering {n_invalid} NaN frames ({100*n_invalid/N_raw:.1f}%)")
+        qpos = qpos[valid_mask]
+        qvel = qvel[valid_mask]
+        # Save the valid mask for reconstructing full-length arrays later
+        np.save(os.path.join(args.data_dir, 'umap_valid_mask.npy'), valid_mask)
+
     N = qpos.shape[0]
+    print(f"  Valid frames: {N} ({100*N/N_raw:.1f}%)")
+
     combined = np.concatenate([qpos, qvel], axis=1)
     print(f"  combined: {combined.shape} ({combined.nbytes/1e6:.0f} MB)")
 
