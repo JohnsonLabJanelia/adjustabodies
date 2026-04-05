@@ -95,7 +95,7 @@ fi
 if [[ "$STAGE" == "2" || "$STAGE" == "both" ]]; then
     DEP_FLAG=""
     if [[ "$STAGE" == "both" && -n "${JOB1:-}" ]]; then
-        DEP_FLAG="-w done($JOB1)"
+        DEP_FLAG="-w \"done($JOB1)\""
     fi
 
     BSUB_2="bsub -W 1:00 -n 8 -gpu \"num=1\" -q gpu_a100 -P johnson \
