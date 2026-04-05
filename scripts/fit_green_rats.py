@@ -60,18 +60,35 @@ def load_green_binary(path):
     return data, trials_index, traj3d
 
 
-def extract_frames(data, trials_index, traj3d, trial_ids, n_frames, rng):
-    """Extract n_frames random frames from given trials as (kp3d[24,3], valid[24]) in meters."""
+def extract_frames(data, trials_index, traj3d, trial_ids, n_frames, rng,
+                    trial_phases=None):
+    """Extract n_frames random frames from active phases of given trials.
+
+    Args:
+        trial_phases: optional dict[trial_id] → (start_frame, end_frame) for active phase.
+                      If provided, only samples from within these ranges.
+                      If None, uses middle 80% of each trial.
+    """
     stride = traj3d['epf']
     traj_offset = traj3d['offset']
 
     pool = []
     for tid in trial_ids:
         offset, nf = trials_index[tid]
-        start_f = max(0, int(nf * 0.1))
-        end_f = min(nf, int(nf * 0.9))
+        if trial_phases and tid in trial_phases:
+            start_f, end_f = trial_phases[tid]
+            start_f = max(0, int(start_f))
+            end_f = min(nf, int(end_f))
+        else:
+            start_f = max(0, int(nf * 0.1))
+            end_f = min(nf, int(nf * 0.9))
+        if end_f <= start_f:
+            continue
         for f in range(start_f, end_f):
             pool.append((tid, f, offset, nf))
+
+    if not pool:
+        return []
 
     # Oversample 3x to compensate for frames with too few valid keypoints
     n_sample = min(n_frames * 3, len(pool))
@@ -239,6 +256,15 @@ def main():
         rat_trials[rat] = tids
         print(f"    {rat}: {len(tids)} trials")
 
+    # ── Load phase boundaries (arena → return = active behavior) ──
+    print("\n  Loading phase boundaries...")
+    phase_rows = db.sql(
+        "SELECT id, arena_idx, return_idx FROM trials "
+        "WHERE is_valid=1 AND arena_idx IS NOT NULL AND return_idx IS NOT NULL"
+    ).fetchall()
+    trial_phases = {r[0]: (int(r[1]), int(r[2])) for r in phase_rows}
+    print(f"  {len(trial_phases)} trials with active phase boundaries")
+
     rng = np.random.default_rng(args.seed)
 
     # ── JAX info ────────────────────────────────────────────────
@@ -253,7 +279,8 @@ def main():
     all_frames = []
     for rat in rats:
         rat_frames = extract_frames(bindata, trials_index, traj3d,
-                                     rat_trials[rat], args.frames_average, rng)
+                                     rat_trials[rat], args.frames_average, rng,
+                                     trial_phases=trial_phases)
         print(f"  {rat}: {len(rat_frames)} frames")
         all_frames.extend(rat_frames)
     print(f"  Total: {len(all_frames)} frames")
@@ -269,7 +296,8 @@ def main():
         print(f"{'*'*70}")
 
         rat_frames = extract_frames(bindata, trials_index, traj3d,
-                                     rat_trials[rat], args.frames_per_rat, rng)
+                                     rat_trials[rat], args.frames_per_rat, rng,
+                                     trial_phases=trial_phases)
         print(f"  Extracted: {len(rat_frames)} frames")
 
         output = os.path.join(args.output_dir, f'rodent_green_{rat}.mjb')
