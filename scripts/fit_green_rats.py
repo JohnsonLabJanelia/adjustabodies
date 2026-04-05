@@ -117,6 +117,8 @@ def fit_on_frames(model_xml, frames, output_path, label, n_rounds=6, m_iters=300
 
     This is fit_body_model() but accepts frames directly instead of loading from CSV.
     """
+    from adjustabodies import enable_jax_cache
+    enable_jax_cache()
     import jax
     import jax.numpy as jnp
     import mujoco
