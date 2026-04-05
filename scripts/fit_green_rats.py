@@ -73,17 +73,23 @@ def extract_frames(data, trials_index, traj3d, trial_ids, n_frames, rng):
         for f in range(start_f, end_f):
             pool.append((tid, f, offset, nf))
 
-    n_sample = min(n_frames, len(pool))
+    # Oversample 3x to compensate for frames with too few valid keypoints
+    n_sample = min(n_frames * 3, len(pool))
     indices = rng.choice(len(pool), size=n_sample, replace=False)
 
     frames = []
     for idx in indices:
+        if len(frames) >= n_frames:
+            break
         tid, fi, trial_offset, nf = pool[idx]
         start = trial_offset + nf * traj_offset
         frame_start = start + fi * stride * 4
         arr = np.frombuffer(data[frame_start:frame_start + stride * 4], dtype=np.float32)
         kp = arr[:72].reshape(24, 3).copy() * 0.001  # mm → m
         valid = np.isfinite(kp).all(axis=-1) & ~(kp == 0).all(axis=-1)
+        # Require at least 12 valid keypoints (half the skeleton)
+        if valid.sum() < 12:
+            continue
         frames.append((kp.astype(np.float32), valid.astype(np.float32)))
 
     return frames
