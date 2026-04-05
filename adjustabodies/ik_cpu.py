@@ -57,6 +57,17 @@ def solve_ik_frame(m: mujoco.MjModel, d: mujoco.MjData,
         momentum[:] = beta * momentum + grad
         step = -lr * momentum
         mujoco.mj_integratePos(m, d.qpos, step, 1.0)
+
+        # Clamp joints to limits (matching Green's C++ mujoco_ik.h)
+        for j in range(m.njnt):
+            if not m.jnt_limited[j]:
+                continue
+            qa = int(m.jnt_qposadr[j])
+            if m.jnt_type[j] in (2, 3):  # SLIDE or HINGE
+                lo, hi = m.jnt_range[j]
+                if d.qpos[qa] < lo: d.qpos[qa] = lo
+                if d.qpos[qa] > hi: d.qpos[qa] = hi
+
         mujoco.mj_fwdPosition(m, d)
 
     return d.qpos.copy()
