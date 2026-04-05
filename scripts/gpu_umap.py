@@ -33,7 +33,7 @@ import time
 import numpy as np
 
 
-def gpu_embed(data_np, name, n_pca, n_neighbors, min_dist, seed):
+def gpu_embed(data_np, name, n_pca, n_components, n_neighbors, min_dist, seed):
     """z-score → PCA → UMAP on GPU. Returns (embedding, info_dict)."""
     import cupy as cp
     from cuml.decomposition import PCA
@@ -45,15 +45,24 @@ def gpu_embed(data_np, name, n_pca, n_neighbors, min_dist, seed):
     # Transfer to GPU
     data = cp.asarray(data_np, dtype=cp.float32)
 
-    # Z-score normalize
+    # Z-score normalize, drop zero-variance columns (e.g. unused joints)
     mean = cp.mean(data, axis=0)
     std = cp.std(data, axis=0)
-    std[std == 0] = 1.0
+    nonzero_mask = std > 1e-8
+    n_dropped = int((~nonzero_mask).sum())
+    if n_dropped > 0:
+        print(f"  Dropping {n_dropped} zero-variance columns "
+              f"({int(nonzero_mask.sum())} remaining)")
+        data = data[:, nonzero_mask]
+        std = std[nonzero_mask]
+        mean = mean[nonzero_mask]
     data = (data - mean) / std
+    info['n_dropped_cols'] = n_dropped
     info['t_zscore'] = time.time() - t0
 
-    # PCA
+    # PCA (cap components to available dimensions)
     t1 = time.time()
+    n_pca = min(n_pca, data.shape[1] - 1)
     pca = PCA(n_components=n_pca)
     data_pca = pca.fit_transform(data)
     var_explained = float(cp.asnumpy(pca.explained_variance_ratio_).sum())
@@ -70,7 +79,7 @@ def gpu_embed(data_np, name, n_pca, n_neighbors, min_dist, seed):
     t2 = time.time()
     umap = UMAP(
         n_neighbors=n_neighbors,
-        n_components=2,
+        n_components=n_components,
         min_dist=min_dist,
         metric='euclidean',
         random_state=seed,
@@ -95,6 +104,7 @@ def main():
     parser.add_argument('--n-pca-pos', type=int, default=20, help="PCA components for qpos")
     parser.add_argument('--n-pca-vel', type=int, default=20, help="PCA components for qvel")
     parser.add_argument('--n-pca-combined', type=int, default=30, help="PCA components for combined")
+    parser.add_argument('--n-components', type=int, default=3, help="UMAP output dims (2 or 3)")
     parser.add_argument('--n-neighbors', type=int, default=15)
     parser.add_argument('--min-dist', type=float, default=0.1)
     parser.add_argument('--seed', type=int, default=42)
@@ -134,11 +144,11 @@ def main():
             continue
 
         print(f"\n{'='*60}")
-        print(f"Embedding: {name} ({data.shape[0]} × {data.shape[1]} → PCA {n_pca} → UMAP 2D)")
+        print(f"Embedding: {name} ({data.shape[0]} × {data.shape[1]} → PCA {n_pca} → UMAP {args.n_components}D)")
         print(f"{'='*60}")
 
         embedding, info = gpu_embed(
-            data, name, n_pca,
+            data, name, n_pca, args.n_components,
             args.n_neighbors, args.min_dist, args.seed)
 
         np.save(out_path, embedding)
