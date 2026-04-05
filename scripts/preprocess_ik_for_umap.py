@@ -202,6 +202,19 @@ def main():
             T = len(qpos_series)
             n_trimmed += 1
 
+        # Filter out bad frames: NaN qpos, high residual, or garbage poses
+        good = (np.isfinite(qpos_series).all(axis=1) &   # no NaN
+                np.isfinite(residuals_arr) &               # valid residual
+                (residuals_arr >= 0) &                     # IK ran
+                (residuals_arr < 50.0))                    # not garbage (<50mm)
+        if good.sum() < 10:
+            continue
+        if good.sum() < T:
+            qpos_series = qpos_series[good]
+            frames_arr = frames_arr[good]
+            residuals_arr = residuals_arr[good]
+            T = len(qpos_series)
+
         # Compute qvel for this trial (consecutive frames enable warm-start)
         qvel_series = compute_qvel(m, qpos_series, fps=args.fps,
                                     smooth_window=args.smooth_window)
@@ -228,7 +241,8 @@ def main():
             n_so_far = sum(len(a) for a in all_qpos_hinges)
             print(f"  {i+1}/{len(trial_ids_sorted)} trials, {n_so_far/1e6:.1f}M frames...")
 
-    print(f"  Trimmed {n_trimmed} trials to active phase (arena→return)")
+    print(f"  Trimmed {n_trimmed} trials to analysis window")
+    print(f"  (bad frames with NaN/high residual filtered per-trial)")
 
     # ── Concatenate ─────────────────────────────────────────────
     print("Concatenating...")
