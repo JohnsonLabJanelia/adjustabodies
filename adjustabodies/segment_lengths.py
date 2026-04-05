@@ -144,8 +144,10 @@ def compute_model_segment_scale(measured: Dict[str, float],
                                  ) -> Dict[str, float]:
     """Compute per-segment scale factors from measured vs model lengths.
 
-    For segments that map to the same model segment (e.g., all 4 tail segments
-    map to 'tail'), computes the median scale across all measurements.
+    For segments with multiple measurements mapping to the same model segment
+    (e.g., 4 tail segments all map to 'tail'), uses the total chain length
+    ratio instead of median of individual ratios. This is more accurate when
+    the model's internal proportions don't match the real anatomy.
 
     Args:
         measured: from measure_segment_lengths (meters)
@@ -154,19 +156,20 @@ def compute_model_segment_scale(measured: Dict[str, float],
     Returns:
         dict mapping model segment name → target scale factor
     """
-    segment_scales = {}
+    # Sum measured and model lengths per model segment
+    data_total = {}
+    model_total = {}
     for name in measured:
         model_seg = SEGMENT_TO_MODEL.get(name)
         if model_seg and name in model_lengths and model_lengths[name] > 0.001:
-            scale = measured[name] / model_lengths[name]
-            if model_seg not in segment_scales:
-                segment_scales[model_seg] = []
-            segment_scales[model_seg].append(scale)
+            data_total[model_seg] = data_total.get(model_seg, 0) + measured[name]
+            model_total[model_seg] = model_total.get(model_seg, 0) + model_lengths[name]
 
-    # Take median scale per model segment
+    # Scale = total_data / total_model per segment
     result = {}
-    for seg, scales in segment_scales.items():
-        result[seg] = float(np.median(scales))
+    for seg in data_total:
+        if model_total[seg] > 0.001:
+            result[seg] = float(data_total[seg] / model_total[seg])
 
     return result
 
