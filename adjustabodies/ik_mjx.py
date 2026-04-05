@@ -361,10 +361,12 @@ def batch_ik_mjx(m, frames, site_ids, config=None):
     if config is None:
         config = IKConfig()
 
+    import mujoco as _mj
     from .model import _fix_geoms_for_mjx
 
-    # Apply MJX geom fixes (modifies model in place — caller should pass a dedicated copy)
-    _fix_geoms_for_mjx(m)
+    # Apply MJX geom fixes if not already applied
+    if not (m.opt.disableflags & _mj.mjtDisableBit.mjDSBL_CONTACT):
+        _fix_geoms_for_mjx(m)
 
     print(f"[ik_mjx] Building solver (max_iters={config.max_iters}, "
           f"lr={config.lr}, batch_size={config.batch_size})...")

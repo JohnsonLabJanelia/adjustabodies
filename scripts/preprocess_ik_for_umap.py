@@ -276,20 +276,25 @@ def main():
         animal=animals, session=sessions, curr_day=days,
         is_success=success, dataset=datasets)
 
-    # Trial boundaries for trajectory tracing
+    # Trial boundaries for trajectory tracing (built from actual output data)
+    unique_tids = []
     trial_starts = []
     trial_lengths = []
     pos = 0
-    for tid in trial_ids_sorted:
-        t = trials[tid]
-        T = len(t['frames'])
-        if T < 10:
-            continue
-        trial_starts.append(pos)
-        trial_lengths.append(T)
-        pos += T
+    prev_tid = -1
+    for i in range(N):
+        tid_i = trial_ids[i]
+        if tid_i != prev_tid:
+            if prev_tid >= 0:
+                trial_lengths.append(pos - trial_starts[-1])
+            unique_tids.append(tid_i)
+            trial_starts.append(pos)
+            prev_tid = tid_i
+        pos += 1
+    if prev_tid >= 0:
+        trial_lengths.append(pos - trial_starts[-1])
     np.savez_compressed(os.path.join(args.output_dir, 'trial_index.npz'),
-        trial_ids=np.array(trial_ids_sorted, dtype=np.int32),
+        trial_ids=np.array(unique_tids, dtype=np.int32),
         starts=np.array(trial_starts, dtype=np.int64),
         lengths=np.array(trial_lengths, dtype=np.int32))
 

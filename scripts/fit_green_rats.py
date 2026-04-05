@@ -191,7 +191,7 @@ def fit_on_frames(model_xml, frames, output_path, label, n_rounds=6, m_iters=300
     offs_final = np.array(params['site_offsets'])
     final_scales = {name: gs_final * rs_final[g] for g, (name, _) in enumerate(segments)}
     apply_segment_scales(m, segments, final_scales, orig_scaled)
-    m.site_pos[:] += offs_final
+    m.site_pos[:] += offs_final  # applies to all sites; non-keypoint offsets ~0 due to regularization
     mujoco.mj_setConst(m, mujoco.MjData(m))
 
     abs_scales = {name: scales[name] * final_scales[name] for name in scales}

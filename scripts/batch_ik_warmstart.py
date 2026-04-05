@@ -82,8 +82,8 @@ def extract_trial_frames(data, trials_index, traj3d, tid, win_start=None, win_en
 
 
 # Global for multiprocessing workers
-_worker_model_path = None
-_worker_site_ids = None
+_worker_model = None
+_worker_site_ids_list = None
 
 
 def init_worker(model_path):

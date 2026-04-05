@@ -54,6 +54,9 @@ def ik_cli():
     session_path = os.path.join(args.data_dir, 'mujoco_session.json')
     arena_tf = ArenaTransform.from_session(session_path) if os.path.exists(session_path) else ArenaTransform()
     kp3d_csv = find_keypoints3d(args.data_dir)
+    if not kp3d_csv:
+        print(f"ERROR: No keypoints3d.csv found in {args.data_dir}")
+        return
     max_f = args.max_frames if args.max_frames > 0 else None
     frames = load_keypoints3d(kp3d_csv, max_frames=max_f, arena_tf=arena_tf)
 
@@ -103,6 +106,9 @@ def ik_mjx_cli():
     session_path = os.path.join(args.data_dir, 'mujoco_session.json')
     arena_tf = ArenaTransform.from_session(session_path) if os.path.exists(session_path) else ArenaTransform()
     kp3d_csv = find_keypoints3d(args.data_dir)
+    if not kp3d_csv:
+        print(f"ERROR: No keypoints3d.csv found in {args.data_dir}")
+        return
     max_f = args.max_frames if args.max_frames > 0 else None
     frames = load_keypoints3d(kp3d_csv, max_frames=max_f, arena_tf=arena_tf)
 
