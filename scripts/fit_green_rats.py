@@ -112,7 +112,8 @@ def extract_frames(data, trials_index, traj3d, trial_ids, n_frames, rng,
     return frames
 
 
-def fit_on_frames(model_xml, frames, output_path, label, n_rounds=6, m_iters=300, ik_iters=1000):
+def fit_on_frames(model_xml, frames, output_path, label, n_rounds=6, m_iters=300, ik_iters=1000,
+                   target_weight=0.05):
     """Run the 2-phase fitting pipeline on a set of frames.
 
     This is fit_body_model() but accepts frames directly instead of loading from CSV.
@@ -168,7 +169,7 @@ def fit_on_frames(model_xml, frames, output_path, label, n_rounds=6, m_iters=300
         init_global=1.0, init_rel_scales=init_rel_scales,
         n_rounds=n_rounds, m_iters=m_iters, ik_iters=ik_iters,
         lr_scale=0.003, reg_scale=0.001,
-        segment_targets=segment_targets, segment_target_weight=1.0,
+        segment_targets=segment_targets, segment_target_weight=target_weight,
         verbose=True)
 
     gs = float(params['global_scale'])
@@ -245,6 +246,10 @@ def main():
     parser.add_argument('--n-rounds', type=int, default=6)
     parser.add_argument('--m-iters', type=int, default=300)
     parser.add_argument('--ik-iters', type=int, default=1000)
+    parser.add_argument('--target-weight', type=float, default=0.05,
+                        help="Segment target constraint weight (0=unconstrained, 1=rigid)")
+    parser.add_argument('--only-rat', type=str, default=None,
+                        help="Fit only this rat (skip average + other rats)")
     parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
 
@@ -300,11 +305,14 @@ def main():
     print(f"  Total: {len(all_frames)} frames")
 
     avg_output = os.path.join(args.output_dir, 'rodent_green_all.mjb')
-    fit_on_frames(args.base_model, all_frames, avg_output, 'all_rats',
-                  n_rounds=args.n_rounds, m_iters=args.m_iters, ik_iters=args.ik_iters)
+    if args.only_rat is None:
+        fit_on_frames(args.base_model, all_frames, avg_output, 'all_rats',
+                      n_rounds=args.n_rounds, m_iters=args.m_iters, ik_iters=args.ik_iters,
+                      target_weight=args.target_weight)
 
     # ── Fit 2-6: Per-rat models (2500 frames each) ─────────────
-    for rat in rats:
+    fit_rats = [args.only_rat] if args.only_rat else rats
+    for rat in fit_rats:
         print(f"\n{'*'*70}")
         print(f"* {rat.upper()}: {args.frames_per_rat} frames")
         print(f"{'*'*70}")
@@ -316,7 +324,8 @@ def main():
 
         output = os.path.join(args.output_dir, f'rodent_green_{rat}.mjb')
         fit_on_frames(args.base_model, rat_frames, output, rat,
-                      n_rounds=args.n_rounds, m_iters=args.m_iters, ik_iters=args.ik_iters)
+                      n_rounds=args.n_rounds, m_iters=args.m_iters, ik_iters=args.ik_iters,
+                      target_weight=args.target_weight)
 
     db.close()
     print(f"\n{'='*70}")
