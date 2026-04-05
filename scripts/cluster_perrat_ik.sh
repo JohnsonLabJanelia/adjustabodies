@@ -26,7 +26,7 @@ done
 if $RUN_MODE; then
     echo "=== Per-Rat IK Evaluation ==="
     source ~/miniconda3/bin/activate && conda activate mjx
-    pip install -e "$REPO_DIR" --quiet 2>&1 | tail -3
+    pip install -e "$REPO_DIR" duckdb --quiet 2>&1 | tail -3
 
     python3 "$REPO_DIR/scripts/perrat_ik_green.py" \
         --green-dir "$GREEN_DIR" \
