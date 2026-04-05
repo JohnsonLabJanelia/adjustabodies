@@ -112,8 +112,8 @@ def main():
     parser.add_argument('--n-pca-vel', type=int, default=20, help="PCA components for qvel")
     parser.add_argument('--n-pca-combined', type=int, default=30, help="PCA components for combined")
     parser.add_argument('--n-components', type=int, default=3, help="UMAP output dims (2 or 3)")
-    parser.add_argument('--n-neighbors', type=int, default=15)
-    parser.add_argument('--min-dist', type=float, default=0.1)
+    parser.add_argument('--n-neighbors', type=int, default=50)
+    parser.add_argument('--min-dist', type=float, default=0.02)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--skip-existing', action='store_true',
                         help="Skip embeddings that already exist")
