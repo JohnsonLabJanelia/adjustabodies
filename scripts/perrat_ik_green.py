@@ -119,12 +119,12 @@ def main():
     # ── Load database for rat→trial mapping ─────────────────────
     import duckdb
     db = duckdb.connect(args.green_db, read_only=True)
-    rats = db.sql("SELECT DISTINCT animal FROM trials ORDER BY animal").fetchdf()['animal'].tolist()
+    rats = [r[0] for r in db.sql("SELECT DISTINCT animal FROM trials ORDER BY animal").fetchall()]
     print(f"  Rats: {rats}")
 
     rat_trials = {}
     for rat in rats:
-        tids = db.sql(f"SELECT id FROM trials WHERE animal='{rat}' ORDER BY id").fetchdf()['id'].tolist()
+        tids = [r[0] for r in db.sql(f"SELECT id FROM trials WHERE animal='{rat}' ORDER BY id").fetchall()]
         rat_trials[rat] = tids
         total_frames = sum(trials_index[t][1] for t in tids)
         print(f"    {rat}: {len(tids)} trials, ~{total_frames} frames")
