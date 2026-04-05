@@ -65,7 +65,26 @@ if [[ "$RUN_STAGE" == "2" ]]; then
         --n-neighbors 15 \
         --min-dist 0.1
 
+    # Pack into Green binary format immediately after embedding
+    echo ""
+    echo "--- Packing green_umap.bin ---"
+    python3 "$REPO_DIR/scripts/pack_umap_binary.py" \
+        --umap-dir "$UMAP_DIR" \
+        --output "$GREEN_DIR/green_umap.bin"
+
     echo "=== Stage 2 Done ==="
+    exit 0
+fi
+
+if [[ "$RUN_STAGE" == "3" ]]; then
+    echo "=== UMAP Stage 3: Pack binary (standalone) ==="
+    source ~/miniconda3/bin/activate && conda activate mjx
+
+    python3 "$REPO_DIR/scripts/pack_umap_binary.py" \
+        --umap-dir "$UMAP_DIR" \
+        --output "$GREEN_DIR/green_umap.bin"
+
+    echo "=== Stage 3 Done ==="
     exit 0
 fi
 
