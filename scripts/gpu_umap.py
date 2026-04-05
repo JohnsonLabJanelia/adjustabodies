@@ -145,11 +145,16 @@ def main():
     N = qpos.shape[0]
     print(f"  Valid frames: {N} ({100*N/N_raw:.1f}%)")
 
-    combined = np.concatenate([qpos, qvel], axis=1)
+    # Sin/cos encoding of joint angles — linearizes circular joint space
+    # and prevents wraparound artifacts in PCA/UMAP
+    qpos_sc = np.concatenate([np.sin(qpos), np.cos(qpos)], axis=1).astype(np.float32)
+    print(f"  qpos sin/cos: {qpos_sc.shape} ({qpos_sc.nbytes/1e6:.0f} MB)")
+
+    combined = np.concatenate([qpos_sc, qvel], axis=1)
     print(f"  combined: {combined.shape} ({combined.nbytes/1e6:.0f} MB)")
 
     configs = [
-        ('qpos', qpos, args.n_pca_pos),
+        ('qpos', qpos_sc, args.n_pca_pos),
         ('qvel', qvel, args.n_pca_vel),
         ('combined', combined, args.n_pca_combined),
     ]

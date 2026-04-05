@@ -57,9 +57,9 @@ if [[ "$RUN_STAGE" == "2" ]]; then
 
     python3 "$REPO_DIR/scripts/gpu_umap.py" \
         --data-dir "$UMAP_DIR" \
-        --n-pca-pos 20 \
+        --n-pca-pos 30 \
         --n-pca-vel 20 \
-        --n-pca-combined 30 \
+        --n-pca-combined 40 \
         --n-neighbors 50 \
         --min-dist 0.02
 
