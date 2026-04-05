@@ -12,6 +12,7 @@ Requires: pip install "adjustabodies[mjx]"
 
 from typing import List, Tuple, Optional, NamedTuple
 import numpy as np
+from . import enable_jax_cache
 
 
 class IKConfig(NamedTuple):
@@ -207,6 +208,7 @@ def build_ik_solver(m, site_ids, config=None):
         solve_batch: function (kp3d[B,24,3], valid[B,24]) -> (qpos[B,nq], residual_m[B])
         nq: number of qpos dimensions
     """
+    enable_jax_cache()
     import jax
     import jax.numpy as jnp
     from mujoco import mjx

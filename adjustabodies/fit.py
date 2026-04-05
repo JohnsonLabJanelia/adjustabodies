@@ -42,6 +42,8 @@ def fit_body_model(model_xml: str, data_dir: str, output_path: str,
         dict with fitting results (scales, offsets, residuals)
     """
     # Lazy import MJX (only needed on GPU)
+    from . import enable_jax_cache
+    enable_jax_cache()
     import jax
     import jax.numpy as jnp
     from mujoco import mjx
