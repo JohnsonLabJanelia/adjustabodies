@@ -13,7 +13,7 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
 GREEN_DIR="/groups/johnson/johnsonlab/virtual_rodent/green"
 BASE_MODEL="/groups/johnson/johnsonlab/virtual_rodent/body_model/rodent_data_driven_limits.xml"
-OUTPUT_DIR="/groups/johnson/johnsonlab/virtual_rodent/body_model/green_fits"
+OUTPUT_DIR="/groups/johnson/johnsonlab/virtual_rodent/body_model/green_fits_v2_constrained"
 LOG="$GREEN_DIR/fit_green_rats.log"
 DRY_RUN=false
 RUN_MODE=false
