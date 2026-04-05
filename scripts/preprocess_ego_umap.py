@@ -198,31 +198,34 @@ def main():
     n_features = n_kp * 3
     print(f"Keypoint set: {args.keypoints} ({n_kp} keypoints, {n_features}D)")
 
-    # ── Load analysis windows from DuckDB ──
+    # ── Load analysis windows from computed_metrics.csv ──
+    # This uses the same trial_start_frame → trial_end_frame as the Green app playback.
+    import pandas as pd
+    metrics_path = os.path.join(args.green_dir, 'computed_metrics.csv')
+    if not os.path.exists(metrics_path):
+        print(f"ERROR: {metrics_path} not found. Run 'Process Dataset' in Green first.")
+        sys.exit(1)
+
+    metrics = pd.read_csv(metrics_path)
+    print(f"  Loaded {len(metrics)} trials from computed_metrics.csv")
+
+    # Also get animal IDs from DuckDB
     db_path = os.path.join(args.green_dir, 'green.duckdb')
     import duckdb
     con = duckdb.connect(db_path, read_only=True)
-
-    # Use arena_idx → return_idx as analysis window (full active behavior: out + catch + in)
-    # Fall back to num_frames if return_idx not available
-    rows = con.execute("""
-        SELECT id, arena_idx, return_idx, num_frames
-        FROM trials
-        WHERE is_valid = 1 AND arena_idx IS NOT NULL
-        ORDER BY id
-    """).fetchall()
-
-    # Also get animal IDs for coloring
     animal_rows = con.execute("SELECT id, animal FROM trials ORDER BY id").fetchall()
     animal_map = {r[0]: r[1] for r in animal_rows}
     con.close()
 
     trial_windows = {}
-    for tid, arena_idx, return_idx, nf in rows:
-        start = int(arena_idx)
-        end = int(return_idx) if return_idx is not None else int(nf)
-        if end > start + 10:  # minimum 10 frames
-            trial_windows[tid] = (start, end)
+    for _, row in metrics.iterrows():
+        tid = int(row['trial_id'])
+        start = row.get('trial_start_frame')
+        end = row.get('trial_end_frame')
+        if pd.notna(start) and pd.notna(end):
+            start, end = int(start), int(end)
+            if end > start + 10:
+                trial_windows[tid] = (start, end)
 
     print(f"  {len(trial_windows)} trials with analysis windows")
 
