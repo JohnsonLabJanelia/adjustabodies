@@ -124,12 +124,16 @@ def main():
     if args.green_db and os.path.exists(args.green_db):
         import duckdb
         db = duckdb.connect(args.green_db, read_only=True)
-        rows = db.sql("SELECT id, animal, session_name, curr_day, is_success, dataset "
-                       "FROM trials ORDER BY id").fetchall()
+        rows = db.sql(
+            "SELECT id, animal, session_name, curr_day, is_success, dataset, "
+            "arena_idx, return_idx "
+            "FROM trials ORDER BY id").fetchall()
         for row in rows:
             trial_meta[row[0]] = {
                 'animal': row[1], 'session': row[2], 'curr_day': row[3],
                 'is_success': row[4], 'dataset': row[5],
+                'arena_idx': int(row[6]) if row[6] is not None else None,
+                'return_idx': int(row[7]) if row[7] is not None else None,
             }
         db.close()
         print(f"Loaded metadata for {len(trial_meta)} trials")
@@ -151,15 +155,34 @@ def main():
     all_datasets = []
 
     trial_ids_sorted = sorted(trials.keys())
+    n_trimmed = 0
     for i, tid in enumerate(trial_ids_sorted):
         t = trials[tid]
         qpos_series = t['qpos']
+        frames_arr = t['frames']
+        residuals_arr = t['residuals']
         T = len(qpos_series)
 
-        if T < 10:  # skip very short trials
+        if T < 10:
             continue
 
-        # Compute qvel for this trial (with warm-start continuity)
+        # Trim to active phase (arena_idx → return_idx) if available
+        meta = trial_meta.get(tid, {})
+        arena_idx = meta.get('arena_idx')
+        return_idx = meta.get('return_idx')
+        if arena_idx is not None and return_idx is not None:
+            # frames_arr contains the frame indices within the trial
+            # arena_idx and return_idx are absolute frame indices
+            mask = (frames_arr >= arena_idx) & (frames_arr <= return_idx)
+            if mask.sum() < 10:
+                continue
+            qpos_series = qpos_series[mask]
+            frames_arr = frames_arr[mask]
+            residuals_arr = residuals_arr[mask]
+            T = len(qpos_series)
+            n_trimmed += 1
+
+        # Compute qvel for this trial (consecutive frames enable warm-start)
         qvel_series = compute_qvel(m, qpos_series, fps=args.fps,
                                     smooth_window=args.smooth_window)
 
@@ -170,8 +193,8 @@ def main():
         all_qvel_hinges.append(feats['qvel_hinges'])
         all_com_speed.append(feats['com_speed'])
         all_trial_ids.append(np.full(T, tid, dtype=np.int32))
-        all_frame_idxs.append(t['frames'])
-        all_residuals.append(t['residuals'])
+        all_frame_idxs.append(frames_arr)
+        all_residuals.append(residuals_arr)
 
         # Metadata
         meta = trial_meta.get(tid, {})
@@ -184,6 +207,8 @@ def main():
         if (i + 1) % 500 == 0:
             n_so_far = sum(len(a) for a in all_qpos_hinges)
             print(f"  {i+1}/{len(trial_ids_sorted)} trials, {n_so_far/1e6:.1f}M frames...")
+
+    print(f"  Trimmed {n_trimmed} trials to active phase (arena→return)")
 
     # ── Concatenate ─────────────────────────────────────────────
     print("Concatenating...")
