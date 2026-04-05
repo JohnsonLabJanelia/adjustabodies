@@ -45,24 +45,31 @@ def gpu_embed(data_np, name, n_pca, n_components, n_neighbors, min_dist, seed):
     # Transfer to GPU
     data = cp.asarray(data_np, dtype=cp.float32)
 
-    # Z-score normalize, drop zero-variance columns (e.g. unused joints)
+    # Z-score normalize, drop zero/near-zero variance columns
     mean = cp.mean(data, axis=0)
     std = cp.std(data, axis=0)
-    nonzero_mask = std > 1e-8
+    nonzero_mask = std > 1e-6
     n_dropped = int((~nonzero_mask).sum())
+    n_remaining = int(nonzero_mask.sum())
     if n_dropped > 0:
-        print(f"  Dropping {n_dropped} zero-variance columns "
-              f"({int(nonzero_mask.sum())} remaining)")
-        data = data[:, nonzero_mask]
-        std = std[nonzero_mask]
-        mean = mean[nonzero_mask]
+        print(f"  Dropping {n_dropped} zero-variance columns ({n_remaining} remaining)")
+    if n_remaining < 3:
+        print(f"  ERROR: only {n_remaining} columns with variance — cannot embed")
+        return None, {'name': name, 'error': 'too few varying columns'}
+    data = data[:, nonzero_mask]
+    std = std[nonzero_mask]
+    mean = mean[nonzero_mask]
     data = (data - mean) / std
+
+    # Replace any remaining NaN/inf from division
+    data = cp.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+
     info['n_dropped_cols'] = n_dropped
     info['t_zscore'] = time.time() - t0
 
-    # PCA (cap components to available dimensions)
+    # PCA (cap components, minimum 2)
     t1 = time.time()
-    n_pca = min(n_pca, data.shape[1] - 1)
+    n_pca = max(2, min(n_pca, n_remaining - 1))
     pca = PCA(n_components=n_pca)
     data_pca = pca.fit_transform(data)
     var_explained = float(cp.asnumpy(pca.explained_variance_ratio_).sum())
@@ -150,6 +157,11 @@ def main():
         embedding, info = gpu_embed(
             data, name, n_pca, args.n_components,
             args.n_neighbors, args.min_dist, args.seed)
+
+        if embedding is None:
+            print(f"  SKIPPED: {info.get('error', 'unknown error')}")
+            all_info[name] = info
+            continue
 
         np.save(out_path, embedding)
         print(f"  Saved: {out_path} ({embedding.nbytes/1e6:.0f} MB)")
