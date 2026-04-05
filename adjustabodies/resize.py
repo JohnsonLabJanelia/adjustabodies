@@ -60,6 +60,7 @@ def run_resize_phase(m, mx_base, segments, site_ids, orig,
                       init_global=1.0, init_rel_scales=None,
                       n_rounds=6, m_iters=300, ik_iters=1000,
                       lr_scale=0.003, reg_scale=0.001,
+                      segment_targets=None, segment_target_weight=1.0,
                       verbose=True):
     """Phase 1: Optimize segment scales (no site offsets).
 
@@ -87,6 +88,25 @@ def run_resize_phase(m, mx_base, segments, site_ids, orig,
     kp3d_all = jnp.array(np.stack([f[0] for f in frames]))
     valid_all = jnp.array(np.stack([f[1] for f in frames]))
 
+    # Data-driven segment length targets (constrains tail inflation etc.)
+    seg_names = [s[0] for s in segments]
+    target_scales_j = None
+    target_mask_j = None
+    if segment_targets:
+        target_arr = np.ones(n_seg, dtype=np.float32)
+        mask_arr = np.zeros(n_seg, dtype=np.float32)
+        for g, (name, _) in enumerate(segments):
+            if name in segment_targets:
+                target_arr[g] = segment_targets[name]
+                mask_arr[g] = 1.0
+        target_scales_j = jnp.array(target_arr)
+        target_mask_j = jnp.array(mask_arr)
+        if verbose:
+            constrained = [(name, segment_targets[name])
+                           for name in seg_names if name in segment_targets]
+            print(f"  Segment targets: {', '.join(f'{n}={s:.3f}' for n, s in constrained)}")
+            print(f"  Target weight: {segment_target_weight}")
+
     def fk_sites(mx, qpos):
         dx = mjx.make_data(mx).replace(qpos=qpos)
         dx = mjx.kinematics(mx, dx)
@@ -101,7 +121,16 @@ def run_resize_phase(m, mx_base, segments, site_ids, orig,
         res = (kp_sites - kp3d) * valid[:, :, None]
         ik_loss = jnp.mean(jnp.sum(res ** 2, axis=-1))
         r_s = reg_scale * jnp.sum((params['rel_scales'] - 1.0) ** 2)
-        return ik_loss + r_s, {'ik': ik_loss}
+
+        # Data-driven segment length constraint:
+        # Pull absolute scale (global * rel) toward measured target for each segment
+        seg_target_loss = jnp.array(0.0)
+        if target_scales_j is not None:
+            abs_scales = params['global_scale'] * params['rel_scales']
+            seg_target_loss = segment_target_weight * jnp.sum(
+                target_mask_j * (abs_scales - target_scales_j) ** 2)
+
+        return ik_loss + r_s + seg_target_loss, {'ik': ik_loss, 'seg': seg_target_loss}
 
     @jax.jit
     def m_step(params, opt_state, qpos_j, kp3d, valid):
@@ -152,11 +181,13 @@ def run_resize_phase(m, mx_base, segments, site_ids, orig,
             pre_residual = ik_mm
         gs = float(params['global_scale'])
         rs = np.array(params['rel_scales'])
-        changed = [(seg_names[g], rs[g]) for g in range(n_seg) if abs(rs[g] - 1.0) > 0.01]
-        ch_str = ", ".join(f"{n}={r:.3f}" for n, r in changed[:6]) if changed else "(~1.0)"
+        changed = [(seg_names[g], gs*rs[g]) for g in range(n_seg) if abs(rs[g] - 1.0) > 0.01]
+        ch_str = ", ".join(f"{n}={s:.3f}" for n, s in changed[:6]) if changed else "(~1.0)"
 
         if verbose:
+            seg_loss = float(metrics.get('seg', 0.0))
+            extra = f" seg_loss={seg_loss:.4f}" if seg_loss > 0 else ""
             print(f"  Round {rnd+1}/{n_rounds}: IK={ik_mm:.2f}mm Q={dt_q:.0f}s M={dt_m:.1f}s "
-                  f"global={gs:.3f} {ch_str}")
+                  f"global={gs:.3f} {ch_str}{extra}")
 
     return params, pre_residual, ik_mm

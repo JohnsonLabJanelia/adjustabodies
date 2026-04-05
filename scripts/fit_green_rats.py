@@ -151,13 +151,25 @@ def fit_on_frames(model_xml, frames, output_path, label, n_rounds=6, m_iters=300
         [SEGMENT_LENGTH_INIT.get(name, 1.0) for name, _ in segments],
         dtype=np.float32)
 
-    # Phase 1: Segment scaling
+    # Measure segment lengths from data to constrain fitting
+    from adjustabodies.segment_lengths import (
+        measure_segment_lengths, measure_model_segments, compute_model_segment_scale)
+    measured = measure_segment_lengths(frames)
+    model_lengths = measure_model_segments(m, site_ids)
+    segment_targets = compute_model_segment_scale(measured, model_lengths)
+    print(f"\n  Data-driven segment targets:")
+    for seg, scale in sorted(segment_targets.items()):
+        print(f"    {seg:12s}: scale={scale:.3f}")
+
+    # Phase 1: Segment scaling (with data-driven constraints)
     print(f"\n--- Phase 1: Segment scaling ---")
     params, pre_res, post_res_1 = run_resize_phase(
         m, mx_base, segments, site_ids, orig, frames, apply_scales_fn,
         init_global=1.0, init_rel_scales=init_rel_scales,
         n_rounds=n_rounds, m_iters=m_iters, ik_iters=ik_iters,
-        lr_scale=0.003, reg_scale=0.001, verbose=True)
+        lr_scale=0.003, reg_scale=0.001,
+        segment_targets=segment_targets, segment_target_weight=1.0,
+        verbose=True)
 
     gs = float(params['global_scale'])
     rs = np.array(params['rel_scales'])
