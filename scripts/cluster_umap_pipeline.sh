@@ -44,6 +44,7 @@ if [[ "$RUN_STAGE" == "1" ]]; then
         --qpos-csv "$QPOS_CSV" \
         --model "$MODEL" \
         --green-db "$GREEN_DB" \
+        --metrics-csv "$GREEN_DIR/computed_metrics.csv" \
         --output-dir "$UMAP_DIR" \
         --fps 180 \
         --smooth-window 37

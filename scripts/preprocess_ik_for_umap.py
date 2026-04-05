@@ -103,6 +103,8 @@ def main():
                         help="Savitzky-Golay window (frames). 0=no smoothing.")
     parser.add_argument('--max-residual', type=float, default=None,
                         help="Discard frames with residual above this (mm)")
+    parser.add_argument('--metrics-csv', default=None,
+                        help="computed_metrics.csv for analysis window trimming")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -125,18 +127,40 @@ def main():
         import duckdb
         db = duckdb.connect(args.green_db, read_only=True)
         rows = db.sql(
-            "SELECT id, animal, session_name, curr_day, is_success, dataset, "
-            "arena_idx, return_idx "
+            "SELECT id, animal, session_name, curr_day, is_success, dataset "
             "FROM trials ORDER BY id").fetchall()
         for row in rows:
             trial_meta[row[0]] = {
                 'animal': row[1], 'session': row[2], 'curr_day': row[3],
                 'is_success': row[4], 'dataset': row[5],
-                'arena_idx': int(row[6]) if row[6] is not None else None,
-                'return_idx': int(row[7]) if row[7] is not None else None,
             }
         db.close()
         print(f"Loaded metadata for {len(trial_meta)} trials")
+
+    # Load analysis window from computed_metrics.csv (from Green's Process All)
+    trial_windows = {}
+    metrics_csv = args.metrics_csv
+    if not metrics_csv:
+        # Try default location next to qpos CSV
+        candidate = os.path.join(os.path.dirname(args.qpos_csv), 'computed_metrics.csv')
+        if os.path.exists(candidate):
+            metrics_csv = candidate
+    if metrics_csv and os.path.exists(metrics_csv):
+        import csv
+        with open(metrics_csv) as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                tid = int(row['trial_id'])
+                start = row.get('trial_start_frame', '')
+                end = row.get('trial_end_frame', '')
+                if start and end:
+                    try:
+                        trial_windows[tid] = (int(float(start)), int(float(end)))
+                    except ValueError:
+                        pass
+        print(f"Loaded analysis windows for {len(trial_windows)} trials from {metrics_csv}")
+    else:
+        print("WARNING: No computed_metrics.csv found — using all frames per trial")
 
     # ── Compute qvel per trial ──────────────────────────────────
     print(f"\nComputing qvel (fps={args.fps}, smooth={args.smooth_window})...")
@@ -166,14 +190,10 @@ def main():
         if T < 10:
             continue
 
-        # Trim to active phase (arena_idx → return_idx) if available
-        meta = trial_meta.get(tid, {})
-        arena_idx = meta.get('arena_idx')
-        return_idx = meta.get('return_idx')
-        if arena_idx is not None and return_idx is not None:
-            # frames_arr contains the frame indices within the trial
-            # arena_idx and return_idx are absolute frame indices
-            mask = (frames_arr >= arena_idx) & (frames_arr <= return_idx)
+        # Trim to analysis window (trial_start_frame → trial_end_frame)
+        if tid in trial_windows:
+            win_start, win_end = trial_windows[tid]
+            mask = (frames_arr >= win_start) & (frames_arr <= win_end)
             if mask.sum() < 10:
                 continue
             qpos_series = qpos_series[mask]
