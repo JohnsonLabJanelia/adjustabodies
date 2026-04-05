@@ -57,7 +57,7 @@ def solve_ik_frame(m: mujoco.MjModel, d: mujoco.MjData,
 
 def batch_ik_cpu(m: mujoco.MjModel, frames, site_ids: List[int],
                   max_iters: int = 1000, **kwargs) -> np.ndarray:
-    """Solve IK for a batch of frames on CPU.
+    """Solve IK for a batch of frames on CPU (no warm-start between frames).
 
     Args:
         m: MuJoCo model
@@ -80,3 +80,50 @@ def batch_ik_cpu(m: mujoco.MjModel, frames, site_ids: List[int],
         all_qpos[i] = solve_ik_frame(m, d, targets, max_iters=max_iters, **kwargs)
 
     return all_qpos
+
+
+def batch_ik_cpu_trial(m: mujoco.MjModel, frames, site_ids: List[int],
+                        max_iters: int = 1000, warm_iters: int = 200,
+                        **kwargs) -> Tuple[np.ndarray, np.ndarray]:
+    """Solve IK for a sequence of frames with warm-starting (one trial).
+
+    Frame 0 cold-starts, subsequent frames warm-start from the previous
+    solution with fewer iterations. This produces temporally consistent
+    poses essential for UMAP and behavioral analysis.
+
+    Args:
+        m: MuJoCo model
+        frames: list of (kp3d[24,3], valid[24]) tuples (sequential)
+        site_ids: list of site indices
+        max_iters: iterations for cold-start (frame 0)
+        warm_iters: iterations for warm-start (frames 1+)
+
+    Returns:
+        all_qpos: [N, nq] array
+        residuals: [N] array in meters
+    """
+    d = mujoco.MjData(m)
+    N = len(frames)
+    all_qpos = np.zeros((N, m.nq), dtype=np.float64)
+    residuals = np.full(N, np.nan, dtype=np.float64)
+
+    for i, (kp_mj, valid) in enumerate(frames):
+        targets = [(site_ids[k], kp_mj[k])
+                    for k in range(24) if valid[k] > 0.5 and site_ids[k] >= 0]
+        if not targets:
+            # No valid keypoints — reset warm-start
+            mujoco.mj_resetData(m, d)
+            continue
+
+        iters = max_iters if i == 0 else warm_iters
+        ws = (i > 0)  # warm-start from previous frame's qpos (still in d)
+
+        all_qpos[i] = solve_ik_frame(m, d, targets, max_iters=iters,
+                                      warm_start=ws, **kwargs)
+
+        # Compute residual
+        err_sq = sum(np.sum((d.site_xpos[sid] - tgt) ** 2)
+                     for sid, tgt in targets)
+        residuals[i] = np.sqrt(err_sq / len(targets))
+
+    return all_qpos, residuals
