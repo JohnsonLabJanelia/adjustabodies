@@ -97,7 +97,32 @@ def main():
     else:
         com_speed = np.zeros(total_frames, dtype=np.float32)
 
-    assert len(umap_qpos) == total_frames, f"Frame count mismatch: {len(umap_qpos)} vs {total_frames}"
+    # After valid_mask expansion, all arrays should be total_frames long.
+    # If no valid_mask and sizes differ, the preprocessing trimmed frames —
+    # use the actual embedding size and rebuild trial_lengths from metadata.
+    if len(umap_qpos) != total_frames:
+        print(f"  Frame count: embeddings={len(umap_qpos)} vs index={total_frames}")
+        print(f"  Rebuilding trial index from metadata...")
+        meta = np.load(os.path.join(args.umap_dir, 'metadata.npz'))
+        meta_trial_ids = meta['trial_id']
+        # Rebuild trial starts/lengths from the actual metadata
+        new_starts = []
+        new_lengths = []
+        new_trial_ids = []
+        pos = 0
+        for tid in trial_ids:
+            n = int((meta_trial_ids == tid).sum())
+            if n > 0:
+                new_trial_ids.append(tid)
+                new_starts.append(pos)
+                new_lengths.append(n)
+                pos += n
+        trial_ids = np.array(new_trial_ids, dtype=np.int32)
+        trial_starts = np.array(new_starts, dtype=np.int64)
+        trial_lengths = np.array(new_lengths, dtype=np.int32)
+        n_trials = len(trial_ids)
+        total_frames = int(trial_lengths.sum())
+        print(f"  Rebuilt: {n_trials} trials, {total_frames} frames")
 
     # ── Define fields ───────────────────────────────────────────
     fields = [
