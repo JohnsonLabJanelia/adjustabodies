@@ -42,8 +42,8 @@ if $RUN_MODE; then
         --base-model "$BASE_MODEL" \
         --output-dir "$OUTPUT_DIR" \
         --traj repaired_traj3d.bin \
-        --frames-per-rat 2500 \
-        --frames-average 500 \
+        --frames-per-rat 500 \
+        --frames-average 100 \
         --n-rounds 6 \
         --m-iters 300 \
         --ik-iters 1000
