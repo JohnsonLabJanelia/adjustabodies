@@ -137,13 +137,12 @@ def egocenter_trial(kp3d_flat):
     T = kp3d_flat.shape[0]
     kp3d = kp3d_flat.reshape(T, NUM_KEYPOINTS, 3)
 
-    # Check validity per frame: need COM keypoints + heading keypoints
-    required_kps = COM_KEYPOINTS + [HEADING_FRONT]
-    valid_mask = np.ones(T, dtype=bool)
-    for kp_idx in required_kps:
-        kp = kp3d[:, kp_idx, :]
-        frame_valid = np.isfinite(kp).all(axis=-1) & ~(kp == 0).all(axis=-1)
-        valid_mask &= frame_valid
+    # Strict quality check: ALL 24 rat keypoints must be valid (finite, non-zero)
+    # This filters out frames with partial tracking or poor pose repair
+    rat_kp = kp3d[:, :NUM_RAT_KEYPOINTS, :]  # (T, 24, 3)
+    kp_finite = np.isfinite(rat_kp).all(axis=-1)     # (T, 24)
+    kp_nonzero = ~(rat_kp == 0).all(axis=-1)          # (T, 24)
+    valid_mask = (kp_finite & kp_nonzero).all(axis=1)  # (T,) — all 24 must pass
 
     # COM
     com_kps = kp3d[:, COM_KEYPOINTS, :]  # (T, 5, 3)
