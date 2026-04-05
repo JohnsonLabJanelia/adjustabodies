@@ -203,10 +203,10 @@ def main():
     import duckdb
     con = duckdb.connect(db_path, read_only=True)
 
-    # Use arena_idx → ball_offarena_idx as analysis window (active behavior)
-    # Fall back to arena_idx → num_frames if ball_offarena not available
+    # Use arena_idx → return_idx as analysis window (full active behavior: out + catch + in)
+    # Fall back to num_frames if return_idx not available
     rows = con.execute("""
-        SELECT id, arena_idx, ball_offarena_idx, num_frames
+        SELECT id, arena_idx, return_idx, num_frames
         FROM trials
         WHERE is_valid = 1 AND arena_idx IS NOT NULL
         ORDER BY id
@@ -218,9 +218,9 @@ def main():
     con.close()
 
     trial_windows = {}
-    for tid, arena_idx, offarena_idx, nf in rows:
+    for tid, arena_idx, return_idx, nf in rows:
         start = int(arena_idx)
-        end = int(offarena_idx) if offarena_idx is not None else int(nf)
+        end = int(return_idx) if return_idx is not None else int(nf)
         if end > start + 10:  # minimum 10 frames
             trial_windows[tid] = (start, end)
 
