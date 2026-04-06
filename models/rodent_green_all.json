@@ -1,0 +1,22 @@
+{
+  "adjustabodies_version": "0.1.0",
+  "base_model": "/groups/johnson/johnsonlab/virtual_rodent/body_model/rodent_data_driven_limits.xml",
+  "data_source": "green/all_rats",
+  "n_frames": 500,
+  "phase1_residual_mm": 3.858288288116455,
+  "phase2_residual_mm": 2.980543375015259,
+  "segment_scales": {
+    "head": 0.9453989744032576,
+    "neck": 0.9940567359544517,
+    "spine": 1.1958214124122435,
+    "pelvis": 0.9980582821825834,
+    "tail": 1.006103068422739,
+    "scapula": 0.9961945113189685,
+    "upper_arm": 0.6802046636558678,
+    "lower_arm": 0.9115913054779945,
+    "hand": 0.9657689129510239,
+    "upper_leg": 1.1582726953227152,
+    "lower_leg": 0.7922812543470314,
+    "foot": 0.9624141488859728
+  }
+}
