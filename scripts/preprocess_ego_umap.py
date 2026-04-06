@@ -238,6 +238,7 @@ def main():
     t0 = time.time()
     all_features = []
     all_speeds = []
+    all_frame_ids = []
     all_animals = []
     trial_ids = []
     trial_starts = []
@@ -282,6 +283,9 @@ def main():
         all_features.append(features.astype(np.float32))
         all_speeds.append(speed_win.astype(np.float32))
 
+        # Global frame IDs for cursor mapping
+        all_frame_ids.append(np.arange(start_f, end_f, dtype=np.int32))
+
         animal = animal_map.get(tid, 'unknown')
         all_animals.extend([animal] * len(features))
 
@@ -310,10 +314,13 @@ def main():
           f"({100*valid_all.sum()/len(valid_all):.1f}%)")
 
     # Save
+    frame_ids_all = np.concatenate(all_frame_ids)  # (N,) global frame numbers
+
     np.save(os.path.join(args.output_dir, 'ego_features.npy'), features_all)
     np.save(os.path.join(args.output_dir, 'com_speed.npy'), speeds_all)
     np.save(os.path.join(args.output_dir, 'animal_ids.npy'), animal_ids)
     np.save(os.path.join(args.output_dir, 'valid_mask.npy'), valid_all)
+    np.save(os.path.join(args.output_dir, 'frame_ids.npy'), frame_ids_all)
 
     np.savez(os.path.join(args.output_dir, 'trial_index.npz'),
              trial_ids=np.array(trial_ids, dtype=np.int32),

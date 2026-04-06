@@ -247,6 +247,7 @@ def main():
     np.save(os.path.join(args.output_dir, 'com_speed.npy'), speed)
     np.save(os.path.join(args.output_dir, 'animal_ids.npy'), animal_ids)
     np.save(os.path.join(args.output_dir, 'valid_mask.npy'), valid)
+    np.save(os.path.join(args.output_dir, 'frame_ids.npy'), frame_ids)
 
     np.savez(os.path.join(args.output_dir, 'trial_index.npz'),
              trial_ids=np.array(trial_id_list, dtype=np.int32),
