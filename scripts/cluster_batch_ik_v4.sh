@@ -58,24 +58,27 @@ fi
 # ── Merge mode: combine per-animal CSVs ──────────────────────────────
 
 if $MERGE_MODE; then
-    echo "Merging per-animal CSVs..."
+    echo "Merging per-animal CSVs (adding animal column)..."
     MERGED="$GREEN_DIR/qpos_v4.csv"
-    FIRST=true
+
+    # Write header
+    echo "# GREEN v4 per-animal IK export (merged)" > "$MERGED"
+    echo "# models: $MODELS_DIR" >> "$MERGED"
+    # Get column header from first file, insert animal after frame
+    FIRST_CSV=$(ls "$OUTPUT_DIR"/qpos_*.csv 2>/dev/null | head -1)
+    ORIG_HEADER=$(grep -v '^#' "$FIRST_CSV" | head -1)
+    # Insert 'animal' after 'frame' column: trial,frame,animal,qpos_0,...
+    echo "$ORIG_HEADER" | sed 's/^trial,frame,/trial,frame,animal,/' >> "$MERGED"
+
     for animal in captain emilie heisenberg mario remy; do
         CSV="$OUTPUT_DIR/qpos_${animal}.csv"
         if [[ ! -f "$CSV" ]]; then
             echo "  WARNING: $CSV not found, skipping"
             continue
         fi
-        if $FIRST; then
-            # Include header from first file
-            cat "$CSV" > "$MERGED"
-            FIRST=false
-        else
-            # Skip header lines (# comments and column names)
-            grep -v '^#' "$CSV" | tail -n +2 >> "$MERGED"
-        fi
-        echo "  $animal: $(wc -l < "$CSV") lines"
+        # Skip comment and header lines, prepend animal after trial,frame
+        grep -v '^#' "$CSV" | tail -n +2 | sed "s/^\([^,]*,[^,]*\),/\1,${animal},/" >> "$MERGED"
+        echo "  $animal: $(grep -vc '^#' "$CSV") data lines"
     done
     echo "Merged: $MERGED ($(wc -l < "$MERGED") lines)"
     exit 0
