@@ -1,0 +1,22 @@
+{
+  "adjustabodies_version": "0.1.0",
+  "base_model": "/groups/johnson/johnsonlab/virtual_rodent/body_model/rodent_data_driven_limits.xml",
+  "data_source": "green/heisenberg",
+  "n_frames": 500,
+  "phase1_residual_mm": 3.998434543609619,
+  "phase2_residual_mm": 2.847837209701538,
+  "segment_scales": {
+    "head": 0.9834510166579378,
+    "neck": 1.0195521683720585,
+    "spine": 1.2206368491306563,
+    "pelvis": 1.018492283318949,
+    "tail": 0.9946477086018035,
+    "scapula": 1.0182638638951147,
+    "upper_arm": 0.7043864760242258,
+    "lower_arm": 0.8990014220560099,
+    "hand": 0.9617740015069955,
+    "upper_leg": 1.109967579137603,
+    "lower_leg": 0.8315354799588519,
+    "foot": 0.9565462604314234
+  }
+}

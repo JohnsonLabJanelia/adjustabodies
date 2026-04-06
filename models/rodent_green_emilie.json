@@ -1,0 +1,22 @@
+{
+  "adjustabodies_version": "0.1.0",
+  "base_model": "/groups/johnson/johnsonlab/virtual_rodent/body_model/rodent_data_driven_limits.xml",
+  "data_source": "green/emilie",
+  "n_frames": 500,
+  "phase1_residual_mm": 3.690889596939087,
+  "phase2_residual_mm": 2.669870615005493,
+  "segment_scales": {
+    "head": 0.9356233637274016,
+    "neck": 1.0233109821026858,
+    "spine": 1.2654739234199326,
+    "pelvis": 1.0351638002681511,
+    "tail": 1.0183412656408422,
+    "scapula": 1.029451381816159,
+    "upper_arm": 0.7113685428210985,
+    "lower_arm": 0.9342772543873537,
+    "hand": 0.9929521714655749,
+    "upper_leg": 1.2345962554547327,
+    "lower_leg": 0.8004422341078907,
+    "foot": 1.0047065709725587
+  }
+}
