@@ -96,6 +96,16 @@ def main():
     trial_ids = np.array(trial_ids_list, dtype=np.int32)
     frame_ids = np.array(frame_ids_list, dtype=np.int32)
 
+    # Sort by (trial_id, frame) so binary trials are in ID order
+    sort_idx = np.lexsort((frame_ids, trial_ids))
+    hinges = hinges[sort_idx]
+    residuals = residuals[sort_idx]
+    trial_ids = trial_ids[sort_idx]
+    frame_ids = frame_ids[sort_idx]
+    animals_list = [animals_list[i] for i in sort_idx]
+    print(f"  Sorted by trial ID (range [{trial_ids[0]}, {trial_ids[-1]}])")
+    frame_ids = np.array(frame_ids_list, dtype=np.int32)
+
     # ── Quality filter ────────────────────────────────────────────
     valid = np.isfinite(hinges).all(axis=1) & (residuals < args.max_residual) & (residuals >= 0)
     n_bad = (~valid).sum()
