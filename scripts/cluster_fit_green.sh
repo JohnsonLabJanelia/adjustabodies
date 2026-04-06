@@ -37,7 +37,7 @@ if $RUN_MODE; then
     echo "Date: $(date)"
 
     source ~/miniconda3/bin/activate && conda activate mjx
-    pip install -e "$REPO_DIR" duckdb --quiet 2>&1 | tail -3
+    pip install -e "$REPO_DIR" duckdb --quiet 2>&1 | tail -3 || true
 
     python3 -c "import jax; print(f'JAX {jax.__version__}, {jax.devices()}')"
 
