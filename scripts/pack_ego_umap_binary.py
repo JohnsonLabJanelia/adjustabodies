@@ -84,19 +84,27 @@ def main():
         animal_ids = np.load(animal_path).astype(np.uint8)
         print(f"  animal_ids: {animal_ids.shape}")
 
-    # Build per-frame global frame IDs for cursor mapping
+    # Build per-frame trial IDs and frame numbers for cursor mapping
+    # trial_id: database trial ID (constant within a trial)
+    # frame_id: global frame number within the trial
+    trial_id_per_frame = np.zeros(total_frames, dtype=np.int32)
     frame_ids = np.zeros(total_frames, dtype=np.int32)
-    # Load from metadata if available (preprocess saves frame info)
-    meta_path = os.path.join(args.umap_dir, 'frame_ids.npy')
-    if os.path.exists(meta_path):
-        frame_ids = np.load(meta_path).astype(np.int32)
+
+    frame_ids_path = os.path.join(args.umap_dir, 'frame_ids.npy')
+    if os.path.exists(frame_ids_path):
+        frame_ids = np.load(frame_ids_path).astype(np.int32)
         print(f"  frame_ids: {frame_ids.shape}")
     else:
-        # Fallback: sequential frame indices per trial
         for i in range(n_trials):
             s, l = int(trial_starts[i]), int(trial_lengths[i])
             frame_ids[s:s+l] = np.arange(l, dtype=np.int32)
         print(f"  frame_ids: sequential fallback")
+
+    # Fill trial_id per frame from trial_index
+    for i in range(n_trials):
+        s, l = int(trial_starts[i]), int(trial_lengths[i])
+        trial_id_per_frame[s:s+l] = trial_ids[i]
+    print(f"  trial_ids: {n_trials} trials, range [{trial_ids.min()}, {trial_ids.max()}]")
 
     # Verify sizes
     assert len(umap_ego) == total_frames, f"umap_ego {len(umap_ego)} != {total_frames}"
@@ -110,7 +118,8 @@ def main():
         ('umap_qvel',     3, 4, DTYPE_FLOAT32),  # copy of ego for compat
         ('umap_combined', 3, 4, DTYPE_FLOAT32),  # copy of ego for compat
         ('com_speed',     1, 4, DTYPE_FLOAT32),
-        ('frame_id',      1, 4, DTYPE_INT32),     # global frame number for cursor mapping
+        ('trial_id',      1, 4, DTYPE_INT32),     # database trial ID
+        ('frame_id',      1, 4, DTYPE_INT32),     # global frame number within trial
     ]
     if has_animals:
         fields.append(('animal_id', 1, 1, 1))  # dtype_code 1 = uint8
@@ -163,9 +172,11 @@ def main():
             f.write(umap_ego[start:end].tobytes())
             # Field 4: com_speed (1 × float32)
             f.write(com_speed[start:end].tobytes())
-            # Field 5: frame_id (1 × int32)
+            # Field 5: trial_id (1 × int32)
+            f.write(trial_id_per_frame[start:end].tobytes())
+            # Field 6: frame_id (1 × int32)
             f.write(frame_ids[start:end].tobytes())
-            # Field 6: animal_id (1 × uint8, optional)
+            # Field 7: animal_id (1 × uint8, optional)
             if has_animals:
                 f.write(animal_ids[start:end].tobytes())
 
