@@ -1,7 +1,8 @@
 #!/bin/bash
 # cluster_batch_ik_v4.sh — Batch IK with per-animal v4 fitted models
 #
-# Uses the correct fitted body model for each rat. ~3.5 hours on 8 cores.
+# Submits 5 parallel jobs (one per animal), each using its own fitted model.
+# Results merged into a single CSV at the end.
 #
 # Usage:
 #   bash scripts/cluster_batch_ik_v4.sh [--dry-run]
@@ -13,55 +14,101 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
 GREEN_DIR="/groups/johnson/johnsonlab/virtual_rodent/green"
 MODELS_DIR="/groups/johnson/johnsonlab/virtual_rodent/body_model/green_fits_v4"
-OUTPUT="$GREEN_DIR/qpos_v4.csv"
-LOG="$GREEN_DIR/batch_ik_v4.log"
+OUTPUT_DIR="$GREEN_DIR/qpos_v4"
+LOG_DIR="$GREEN_DIR"
 
 DRY_RUN=false
-RUN_MODE=false
+RUN_ANIMAL=""
+MERGE_MODE=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --dry-run) DRY_RUN=true; shift ;;
-        --run)     RUN_MODE=true; shift ;;
+        --dry-run)     DRY_RUN=true; shift ;;
+        --run-animal)  RUN_ANIMAL="$2"; shift 2 ;;
+        --merge)       MERGE_MODE=true; shift ;;
         *) echo "Unknown: $1"; exit 1 ;;
     esac
 done
 
-if $RUN_MODE; then
-    echo "=== Batch IK v4 (per-animal models) ==="
+# ── Run mode: process one animal ─────────────────────────────────────
+
+if [[ -n "$RUN_ANIMAL" ]]; then
+    echo "=== Batch IK v4: $RUN_ANIMAL ==="
     echo "Host: $(hostname), Date: $(date)"
 
     source ~/miniconda3/bin/activate && conda activate mjx
     pip install -e "$REPO_DIR" duckdb --quiet 2>&1 | tail -3 || true
 
-    python3 "$REPO_DIR/scripts/batch_ik_v4.py" \
+    MODEL="$MODELS_DIR/rodent_green_${RUN_ANIMAL}.mjb"
+    OUTPUT="$OUTPUT_DIR/qpos_${RUN_ANIMAL}.csv"
+    mkdir -p "$OUTPUT_DIR"
+
+    python3 "$REPO_DIR/scripts/batch_ik_warmstart.py" \
         --green-dir "$GREEN_DIR" \
-        --models-dir "$MODELS_DIR" \
+        --model "$MODEL" \
         --output "$OUTPUT" \
         --traj repaired_traj3d.bin \
+        --animal "$RUN_ANIMAL" \
         --workers 8
 
-    echo "=== Done ==="
+    echo "=== Done: $RUN_ANIMAL ==="
     exit 0
 fi
 
-BSUB_CMD="bsub -W 6:00 -n 8 -q local -P johnson \
-    -R \"rusage[mem=16000]\" \
-    -J ik_v4 \
-    -o $LOG \
-    bash $REPO_DIR/scripts/cluster_batch_ik_v4.sh --run"
+# ── Merge mode: combine per-animal CSVs ──────────────────────────────
 
-echo "Batch IK v4 (per-animal models)"
+if $MERGE_MODE; then
+    echo "Merging per-animal CSVs..."
+    MERGED="$GREEN_DIR/qpos_v4.csv"
+    FIRST=true
+    for animal in captain emilie heisenberg mario remy; do
+        CSV="$OUTPUT_DIR/qpos_${animal}.csv"
+        if [[ ! -f "$CSV" ]]; then
+            echo "  WARNING: $CSV not found, skipping"
+            continue
+        fi
+        if $FIRST; then
+            # Include header from first file
+            cat "$CSV" > "$MERGED"
+            FIRST=false
+        else
+            # Skip header lines (# comments and column names)
+            grep -v '^#' "$CSV" | tail -n +2 >> "$MERGED"
+        fi
+        echo "  $animal: $(wc -l < "$CSV") lines"
+    done
+    echo "Merged: $MERGED ($(wc -l < "$MERGED") lines)"
+    exit 0
+fi
+
+# ── Submit mode: launch 5 parallel jobs ──────────────────────────────
+
+echo "Batch IK v4 — 5 parallel per-animal jobs"
 echo "  Green:   $GREEN_DIR"
 echo "  Models:  $MODELS_DIR"
-echo "  Output:  $OUTPUT"
-echo "  Log:     $LOG"
+echo "  Output:  $OUTPUT_DIR/"
 echo ""
 
-if $DRY_RUN; then
-    echo "[dry-run] $BSUB_CMD"
-else
-    eval "$BSUB_CMD"
-    echo "Monitor: bjobs -w | grep ik_v4"
-    echo "Log:     tail -f $LOG"
+mkdir -p "$OUTPUT_DIR" 2>/dev/null || true
+
+for animal in captain emilie heisenberg mario remy; do
+    LOG="$LOG_DIR/batch_ik_v4_${animal}.log"
+    BSUB_CMD="bsub -W 6:00 -n 8 -q local -P johnson \
+        -R \"rusage[mem=16000]\" \
+        -J ik_${animal} \
+        -o $LOG \
+        bash $REPO_DIR/scripts/cluster_batch_ik_v4.sh --run-animal $animal"
+
+    if $DRY_RUN; then
+        echo "[dry-run] $animal: $BSUB_CMD"
+    else
+        eval "$BSUB_CMD"
+        echo "  $animal → $LOG"
+    fi
+done
+
+if ! $DRY_RUN; then
+    echo ""
+    echo "Monitor: bjobs -w | grep ik_"
+    echo "Merge when done: bash $REPO_DIR/scripts/cluster_batch_ik_v4.sh --merge"
 fi

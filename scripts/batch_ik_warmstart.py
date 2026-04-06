@@ -120,6 +120,8 @@ def main():
     parser.add_argument('--metrics-csv', default=None)
     parser.add_argument('--workers', type=int, default=8)
     parser.add_argument('--max-trials', type=int, default=0, help="0 = all")
+    parser.add_argument('--animal', default=None,
+                        help="Only process trials for this animal (requires green.duckdb)")
     args = parser.parse_args()
 
     if args.output is None:
@@ -162,11 +164,24 @@ def main():
     del m_tmp
     print(f"  Model: nq={nq}")
 
+    # Load animal filter if specified
+    animal_trials = None
+    if args.animal:
+        import duckdb
+        db_path = os.path.join(args.green_dir, 'green.duckdb')
+        con = duckdb.connect(db_path, read_only=True)
+        rows = con.execute(f"SELECT id FROM trials WHERE animal='{args.animal}' ORDER BY id").fetchall()
+        animal_trials = set(r[0] for r in rows)
+        con.close()
+        print(f"  Animal filter: {args.animal} ({len(animal_trials)} trials)")
+
     # Build work items
     max_t = args.max_trials if args.max_trials > 0 else n_trials
     work = []
     total_frames = 0
     for tid in range(min(n_trials, max_t)):
+        if animal_trials is not None and tid not in animal_trials:
+            continue
         win = trial_windows.get(tid)
         ws, we = (win if win else (None, None))
         frames, frame_indices = extract_trial_frames(bindata, trials_index, traj3d, tid, ws, we)
