@@ -57,9 +57,9 @@ def run_stac_phase(m, mx_base, segments, site_ids, orig,
         if verbose:
             print(f"  Symmetry: {len(sym_mid)} midline, {len(sym_L)} L/R pairs")
 
-    # Separate LR for scales (frozen) vs offsets (active)
+    # Scales are frozen in Phase 2 — only site offsets are optimized
     optimizer = optax.multi_transform(
-        {'scales': optax.adam(lr_scale), 'offsets': optax.adam(lr_offset)},
+        {'scales': optax.set_to_zero(), 'offsets': optax.adam(lr_offset)},
         param_labels={'global_scale': 'scales', 'rel_scales': 'scales',
                       'site_offsets': 'offsets'})
     opt_state = optimizer.init(params)
@@ -77,9 +77,8 @@ def run_stac_phase(m, mx_base, segments, site_ids, orig,
         kp_sites = all_sites[:, si_j, :]
         res = (kp_sites - kp3d) * valid[:, :, None]
         ik_loss = jnp.mean(jnp.sum(res ** 2, axis=-1))
-        r_s = reg_scale * jnp.sum((params['rel_scales'] - 1.0) ** 2)
         r_o = reg_offset * jnp.sum(params['site_offsets'] ** 2)
-        return ik_loss + r_s + r_o, {'ik': ik_loss}
+        return ik_loss + r_o, {'ik': ik_loss}
 
     use_symmetry = sym_mid is not None
 
@@ -89,8 +88,6 @@ def run_stac_phase(m, mx_base, segments, site_ids, orig,
             params, qpos_j, kp3d, valid)
         updates, new_opt = optimizer.update(grads, opt_state, params)
         new_params = optax.apply_updates(params, updates)
-        new_params['global_scale'] = jnp.clip(new_params['global_scale'], 0.7, 1.5)
-        new_params['rel_scales'] = jnp.clip(new_params['rel_scales'], 0.5, 1.5)
         if use_symmetry:
             new_params['site_offsets'] = enforce_symmetry_jax(
                 new_params['site_offsets'], sym_mid, sym_L, sym_R)
