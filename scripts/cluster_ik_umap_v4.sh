@@ -19,9 +19,10 @@ QPOS_CSV="$GREEN_DIR/qpos_v4.csv"
 UMAP_DIR="$GREEN_DIR/umap_ik_v4"
 OUTPUT_BIN="$GREEN_DIR/green_umap_ik.bin"
 
-N_PCA=20
-N_NEIGHBORS=30
-MIN_DIST=0.05
+N_PCA=40
+N_NEIGHBORS=200
+MIN_DIST=0.10
+METRIC=cosine
 DRY_RUN=false
 RUN_STAGE=""
 
@@ -45,7 +46,9 @@ if [[ "$RUN_STAGE" == "preprocess" ]]; then
         --qpos-csv "$QPOS_CSV" \
         --green-dir "$GREEN_DIR" \
         --output-dir "$UMAP_DIR" \
-        --max-residual 15.0
+        --max-residual 15.0 \
+        --smooth-window 3 \
+        --include-qvel
 
     echo "=== Done ==="
     exit 0
@@ -60,7 +63,8 @@ if [[ "$RUN_STAGE" == "umap" ]]; then
         --data-dir "$UMAP_DIR" \
         --n-pca "$N_PCA" \
         --n-neighbors "$N_NEIGHBORS" \
-        --min-dist "$MIN_DIST"
+        --min-dist "$MIN_DIST" \
+        --metric "$METRIC"
 
     echo "=== Done ==="
     exit 0
@@ -85,7 +89,7 @@ echo "IK UMAP v4 Pipeline (sin/cos hinge angles)"
 echo "  Input:    $QPOS_CSV"
 echo "  UMAP dir: $UMAP_DIR"
 echo "  Output:   $OUTPUT_BIN"
-echo "  PCA: $N_PCA, UMAP: nn=$N_NEIGHBORS md=$MIN_DIST"
+echo "  PCA: $N_PCA, UMAP: nn=$N_NEIGHBORS md=$MIN_DIST metric=$METRIC"
 echo ""
 
 # Stage 1: Preprocess (CPU, ~5 min for 2.5M frames)
@@ -95,7 +99,7 @@ BSUB_PRE="bsub -W 1:00 -n 4 -q local -P johnson \
     bash $REPO_DIR/scripts/cluster_ik_umap_v4.sh --run-preprocess"
 
 # Stage 2: UMAP (GPU, ~5 min)
-BSUB_UMAP="bsub -W 2:00 -n 4 -gpu \"num=1\" -q gpu_a100 -P johnson \
+BSUB_UMAP="bsub -W 4:00 -n 4 -gpu \"num=1\" -q gpu_a100 -P johnson \
     -J ik_umap -w \"done(ik_pre)\" \
     -o $GREEN_DIR/ik_umap_embed.log \
     bash $REPO_DIR/scripts/cluster_ik_umap_v4.sh --run-umap"

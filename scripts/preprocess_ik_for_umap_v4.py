@@ -31,6 +31,10 @@ def main():
     parser.add_argument('--traj', default='repaired_traj3d.bin')
     parser.add_argument('--max-residual', type=float, default=15.0,
                         help="Exclude frames with IK residual above this (mm)")
+    parser.add_argument('--smooth-window', type=int, default=3,
+                        help="Smoothing window for qpos before encoding (0=none)")
+    parser.add_argument('--include-qvel', action='store_true',
+                        help="Include joint velocities (dq/dt) in features")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -166,9 +170,46 @@ def main():
     print(f"  COM speed: mean={speed[speed>0].mean():.2f} mm/f, "
           f"max={speed.max():.1f} mm/f")
 
-    # ── Sin/cos encoding ──────────────────────────────────────────
-    print(f"  Sin/cos encoding: {n_hinges} → {n_hinges * 2} features")
-    features = np.concatenate([np.sin(hinges), np.cos(hinges)], axis=1).astype(np.float32)
+    # ── Smooth qpos per trial ────────────────────────────────────
+    if args.smooth_window > 1:
+        print(f"  Smoothing qpos (window={args.smooth_window}) per trial...")
+        unique_tids = np.unique(trial_ids)
+        for tid in unique_tids:
+            mask = trial_ids == tid
+            idx = np.where(mask)[0]
+            if len(idx) < args.smooth_window:
+                continue
+            for j in range(n_hinges):
+                col = hinges[idx, j]
+                win = args.smooth_window
+                if win % 2 == 0:
+                    win += 1
+                pad = win // 2
+                padded = np.pad(col, (pad, pad), mode='edge')
+                kernel = np.ones(win, dtype=np.float32) / win
+                hinges[idx, j] = np.convolve(padded, kernel, mode='valid')
+
+    # ── Compute qvel (joint velocities) per trial ─────────────────
+    qvel = None
+    if args.include_qvel:
+        print(f"  Computing joint velocities (dq/dt)...")
+        qvel = np.zeros_like(hinges)
+        unique_tids = np.unique(trial_ids)
+        for tid in unique_tids:
+            mask = trial_ids == tid
+            idx = np.where(mask)[0]
+            if len(idx) < 2:
+                continue
+            qvel[idx] = np.gradient(hinges[idx], axis=0).astype(np.float32)
+
+    # ── Sin/cos encoding + optional qvel ──────────────────────────
+    sincos = np.concatenate([np.sin(hinges), np.cos(hinges)], axis=1).astype(np.float32)
+    if qvel is not None:
+        features = np.concatenate([sincos, qvel], axis=1).astype(np.float32)
+        print(f"  Features: sin/cos({n_hinges}×2) + qvel({n_hinges}) = {features.shape[1]}D")
+    else:
+        features = sincos
+        print(f"  Features: sin/cos({n_hinges}×2) = {features.shape[1]}D")
 
     # ── Build trial index ─────────────────────────────────────────
     print("  Building trial index...")

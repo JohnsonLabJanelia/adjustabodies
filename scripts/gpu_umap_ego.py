@@ -24,7 +24,8 @@ import time
 import numpy as np
 
 
-def gpu_embed(data_np, name, n_pca, n_components, n_neighbors, min_dist, seed):
+def gpu_embed(data_np, name, n_pca, n_components, n_neighbors, min_dist, seed,
+              metric='euclidean'):
     """z-score → PCA → UMAP on GPU. Returns (embedding, info_dict)."""
     import cupy as cp
     from cuml.decomposition import PCA
@@ -70,7 +71,7 @@ def gpu_embed(data_np, name, n_pca, n_components, n_neighbors, min_dist, seed):
         n_neighbors=n_neighbors,
         n_components=n_components,
         min_dist=min_dist,
-        metric='euclidean',
+        metric=metric,
         random_state=seed,
     )
     embedding_gpu = umap.fit_transform(data_pca)
@@ -96,6 +97,8 @@ def main():
                         help="UMAP n_neighbors (30 balances local/global)")
     parser.add_argument('--min-dist', type=float, default=0.05,
                         help="UMAP min_dist (0.05 preserves structure)")
+    parser.add_argument('--metric', default='euclidean',
+                        help="UMAP distance metric (euclidean, cosine, etc.)")
     parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
 
@@ -125,7 +128,7 @@ def main():
 
     embedding, info = gpu_embed(
         features_valid, 'ego', args.n_pca, args.n_components,
-        args.n_neighbors, args.min_dist, args.seed)
+        args.n_neighbors, args.min_dist, args.seed, args.metric)
 
     if embedding is None:
         print(f"FAILED: {info.get('error', 'unknown')}")
