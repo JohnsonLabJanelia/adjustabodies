@@ -250,6 +250,8 @@ def main():
                         help="Segment target constraint weight (0=unconstrained, 1=rigid)")
     parser.add_argument('--only-rat', type=str, default=None,
                         help="Fit only this rat (skip average + other rats)")
+    parser.add_argument('--only-average', action='store_true',
+                        help="Fit only the average model (skip per-rat)")
     parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
 
@@ -311,7 +313,12 @@ def main():
                       target_weight=args.target_weight)
 
     # ── Fit 2-6: Per-rat models (2500 frames each) ─────────────
-    fit_rats = [args.only_rat] if args.only_rat else rats
+    if args.only_average:
+        fit_rats = []
+    elif args.only_rat:
+        fit_rats = [args.only_rat]
+    else:
+        fit_rats = rats
     for rat in fit_rats:
         print(f"\n{'*'*70}")
         print(f"* {rat.upper()}: {args.frames_per_rat} frames")
