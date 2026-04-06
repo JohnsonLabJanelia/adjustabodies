@@ -16,6 +16,7 @@ Usage:
 
 import argparse
 import os
+import struct
 import sys
 import time
 import numpy as np
@@ -24,7 +25,10 @@ import numpy as np
 def main():
     parser = argparse.ArgumentParser(description="Preprocess IK qpos for UMAP")
     parser.add_argument('--qpos-csv', required=True, help="Merged qpos_v4.csv")
+    parser.add_argument('--green-dir', required=True,
+                        help="Green data dir (for 3D trajectory → COM speed)")
     parser.add_argument('--output-dir', required=True)
+    parser.add_argument('--traj', default='repaired_traj3d.bin')
     parser.add_argument('--max-residual', type=float, default=15.0,
                         help="Exclude frames with IK residual above this (mm)")
     args = parser.parse_args()
@@ -93,27 +97,74 @@ def main():
     n_bad = (~valid).sum()
     print(f"\n  Residual filter (<{args.max_residual}mm): {valid.sum():,} valid, {n_bad:,} excluded ({100*n_bad/n_total:.1f}%)")
 
-    # ── Compute COM speed from free joint position ────────────────
-    # qpos[0:3] is the free joint translation (global position in meters)
-    # We compute speed per trial for coloring
-    print("  Computing COM speed...")
+    # ── Compute COM speed from 3D trajectory ────────────────────
+    # Load the actual 3D keypoint data and compute 2D COM translational speed
+    COM_KPS = [3, 4, 5, 6, 10]  # Neck, SpineL, TailBase, ShoulderL, ShoulderR
+    FPS = 180
+    print("  Computing COM speed from 3D trajectory...")
+
+    traj_path = os.path.join(args.green_dir, args.traj)
+    traj_data = np.memmap(traj_path, dtype=np.uint8, mode='r')
+    n_traj_trials = struct.unpack_from('<I', traj_data, 8)[0]
+    n_traj_fields = struct.unpack_from('<I', traj_data, 12)[0]
+    # Parse field descriptors to find traj3d
+    cumulative = 0
+    traj3d_field = None
+    for i in range(n_traj_fields):
+        pos = 32 + i * 44
+        name = bytes(traj_data[pos:pos+32]).split(b'\0')[0].decode()
+        epf = struct.unpack_from('<I', traj_data, pos + 32)[0]
+        esz = struct.unpack_from('<I', traj_data, pos + 36)[0]
+        if name == 'traj3d':
+            traj3d_field = {'epf': epf, 'esz': esz, 'offset': cumulative}
+        cumulative += epf * esz
+    # Parse index
+    desc_end = 32 + n_traj_fields * 44
+    idx_start = (desc_end + 7) & ~7
+    traj_index = []
+    for i in range(n_traj_trials):
+        pos = idx_start + i * 12
+        off = struct.unpack_from('<Q', traj_data, pos)[0]
+        nf = struct.unpack_from('<I', traj_data, pos + 8)[0]
+        traj_index.append((off, nf))
+
+    # Precompute per-trial COM (XY only) for speed
+    # Build a lookup: (trial_id, frame) → COM XY position
     speed = np.zeros(n_total, dtype=np.float32)
-    # Group by trial for within-trial speed computation
-    unique_trials = np.unique(trial_ids)
-    for tid in unique_trials:
-        mask = trial_ids == tid
-        idx = np.where(mask)[0]
-        if len(idx) < 2:
-            continue
-        # Free joint position is qpos[0:3], but we stored only hinges
-        # We need the full qpos — let's re-read just the positions
-        # Actually, we didn't store qpos[0:3] in hinges. We need to go back.
-        # For now, use frame-to-frame hinge angle change as a proxy for "movement"
-        h = hinges[idx]
-        diffs = np.diff(h, axis=0)
-        frame_speed = np.sqrt(np.sum(diffs**2, axis=1))
-        speed[idx[1:]] = frame_speed
-        speed[idx[0]] = frame_speed[0] if len(frame_speed) > 0 else 0
+    prev_tid = -1
+    prev_com = None
+    for i in range(n_total):
+        tid = trial_ids[i]
+        frame = frame_ids[i]
+
+        if tid != prev_tid:
+            # Load this trial's 3D data and compute COM for all frames
+            if tid < len(traj_index):
+                t_off, t_nf = traj_index[tid]
+                stride = traj3d_field['epf']
+                start = t_off + t_nf * traj3d_field['offset']
+                nbytes = t_nf * stride * 4
+                arr = np.frombuffer(traj_data[start:start + nbytes],
+                                     dtype=np.float32).reshape(t_nf, stride)
+                # arr is (nf, 75) → reshape to (nf, 25, 3)
+                kp3d = arr[:, :75].reshape(t_nf, 25, 3)
+                # COM from selected keypoints (XY only, in mm)
+                trial_com = np.nanmean(kp3d[:, COM_KPS, :2], axis=1)  # (nf, 2)
+            else:
+                trial_com = None
+            prev_tid = tid
+            prev_com = None
+
+        if trial_com is not None and frame < len(trial_com):
+            com_xy = trial_com[frame]
+            if prev_com is not None and np.isfinite(com_xy).all() and np.isfinite(prev_com).all():
+                speed[i] = np.sqrt(np.sum((com_xy - prev_com)**2))
+            prev_com = com_xy
+        else:
+            prev_com = None
+
+    print(f"  COM speed: mean={speed[speed>0].mean():.2f} mm/f, "
+          f"max={speed.max():.1f} mm/f")
 
     # ── Sin/cos encoding ──────────────────────────────────────────
     print(f"  Sin/cos encoding: {n_hinges} → {n_hinges * 2} features")

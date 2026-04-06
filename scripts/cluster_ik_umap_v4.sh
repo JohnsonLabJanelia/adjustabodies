@@ -43,6 +43,7 @@ if [[ "$RUN_STAGE" == "preprocess" ]]; then
 
     python3 "$REPO_DIR/scripts/preprocess_ik_for_umap_v4.py" \
         --qpos-csv "$QPOS_CSV" \
+        --green-dir "$GREEN_DIR" \
         --output-dir "$UMAP_DIR" \
         --max-residual 15.0
 
