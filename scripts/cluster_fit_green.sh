@@ -17,6 +17,7 @@ OUTPUT_DIR="/groups/johnson/johnsonlab/virtual_rodent/body_model/green_fits_v3"
 LOG="$GREEN_DIR/fit_green_rats.log"
 TARGET_WEIGHT=0.05
 ONLY_RAT=""
+ONLY_AVERAGE=false
 DRY_RUN=false
 RUN_MODE=false
 
@@ -26,6 +27,7 @@ while [[ $# -gt 0 ]]; do
         --run)           RUN_MODE=true; shift ;;
         --weight)        TARGET_WEIGHT="$2"; shift 2 ;;
         --only-rat)      ONLY_RAT="$2"; shift 2 ;;
+        --only-average)  ONLY_AVERAGE=true; shift ;;
         --output-dir)    OUTPUT_DIR="$2"; shift 2 ;;
         *) echo "Unknown: $1"; exit 1 ;;
     esac
@@ -44,6 +46,9 @@ if $RUN_MODE; then
     EXTRA_ARGS=""
     if [[ -n "$ONLY_RAT" ]]; then
         EXTRA_ARGS="--only-rat $ONLY_RAT"
+    fi
+    if $ONLY_AVERAGE; then
+        EXTRA_ARGS="$EXTRA_ARGS --only-average"
     fi
 
     python3 "$REPO_DIR/scripts/fit_green_rats.py" \
