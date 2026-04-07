@@ -104,7 +104,6 @@ def main():
     frame_ids = frame_ids[sort_idx]
     animals_list = [animals_list[i] for i in sort_idx]
     print(f"  Sorted by trial ID (range [{trial_ids[0]}, {trial_ids[-1]}])")
-    frame_ids = np.array(frame_ids_list, dtype=np.int32)
 
     # ── Quality filter ────────────────────────────────────────────
     valid = np.isfinite(hinges).all(axis=1) & (residuals < args.max_residual) & (residuals >= 0)
