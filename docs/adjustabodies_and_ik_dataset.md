@@ -121,6 +121,7 @@ the model's 24 keypoint sites onto the tracked 3D keypoints, frame by frame.
 > the dataset on disk carries the full 68.
 
 qpos layout (per `gait_ik/01_stage_outbound_qpos.py`):
+
 - `q0…q6` — free root: `px py pz qw qx qy qz`
 - `q7…q67` — 61 hinge joints (spine, hindlimbs, tail, neck/head, forelimbs)
 - Limb index groups: **FootL** q13–17, **FootR** q18–22, **HandL** q56–61, **HandR** q62–67
