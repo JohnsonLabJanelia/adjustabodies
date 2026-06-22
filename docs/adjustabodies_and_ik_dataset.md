@@ -125,6 +125,24 @@ qpos layout (per `gait_ik/01_stage_outbound_qpos.py`):
 - `q7…q67` — 61 hinge joints (spine, hindlimbs, tail, neck/head, forelimbs)
 - Limb index groups: **FootL** q13–17, **FootR** q18–22, **HandL** q56–61, **HandR** q62–67
 
+Full per-column joint names (from `QPOS_NAMES`, `gait_ik/01_stage_outbound_qpos.py`),
+grouped by body region:
+
+| Region | Idx | Joint names |
+|---|---|---|
+| **Root** (free joint) | q0–q6 | `root_px`, `root_py`, `root_pz`, `root_qw`, `root_qx`, `root_qy`, `root_qz` |
+| **Spine** (thoracic/lumbar) | q7–q12 | `vertebra_1_extend`, `vertebra_2_bend`, `vertebra_3_twist`, `vertebra_4_extend`, `vertebra_5_bend`, `vertebra_6_twist` |
+| **Hindlimb L** (FootL) | q13–q17 | `hip_L_supinate`, `hip_L_abduct`, `hip_L_extend`, `knee_L`, `ankle_L` |
+| **Hindlimb R** (FootR) | q18–q22 | `hip_R_supinate`, `hip_R_abduct`, `hip_R_extend`, `knee_R`, `ankle_R` |
+| **Tail** (caudal) | q23–q46 | `vertebra_C1_extend`, `vertebra_C1_bend`, `vertebra_C2_extend`, `vertebra_C2_bend`, `vertebra_C3_extend`, `vertebra_C3_bend`, `vertebra_C4_extend`, `vertebra_C4_bend`, `vertebra_C5_extend`, `vertebra_C5_bend`, `vertebra_C6_extend`, `vertebra_C6_bend`, `vertebra_C7_extend`, `vertebra_C9_bend`, `vertebra_C11_extend`, `vertebra_C13_bend`, `vertebra_C15_extend`, `vertebra_C17_bend`, `vertebra_C19_extend`, `vertebra_C21_bend`, `vertebra_C23_extend`, `vertebra_C25_bend`, `vertebra_C27_extend`, `vertebra_C29_bend` |
+| **Neck / head** | q47–q55 | `vertebra_cervical_5_extend`, `vertebra_cervical_4_bend`, `vertebra_cervical_3_twist`, `vertebra_cervical_2_extend`, `vertebra_cervical_1_bend`, `vertebra_axis_twist`, `vertebra_atlant_extend`, `atlas`, `mandible` |
+| **Forelimb L** (HandL) | q56–q61 | `scapula_L_supinate`, `scapula_L_abduct`, `scapula_L_extend`, `shoulder_L`, `shoulder_sup_L`, `elbow_L` |
+| **Forelimb R** (HandR) | q62–q67 | `scapula_R_supinate`, `scapula_R_abduct`, `scapula_R_extend`, `shoulder_R`, `shoulder_sup_R`, `elbow_R` |
+
+(7 root + 6 spine + 5+5 hind + 24 tail + 9 neck/head + 6+6 fore = **68**. The same
+`QPOS_NAMES` ordering applies to all 5 per-rat models — only the body proportions
+differ, not the joint topology.)
+
 ### Location, files, scale
 
 `/Volumes/johnsonlab/virtual_rodent/green/qpos_v4/qpos_<rat>.csv`
