@@ -49,10 +49,14 @@ SEGMENT_TO_MODEL = {
     'shoulder_elbow_R': 'upper_arm',
     'elbow_wrist_L': 'lower_arm',
     'elbow_wrist_R': 'lower_arm',
-    'knee_ankle_L': 'upper_leg',
-    'knee_ankle_R': 'upper_leg',
-    'ankle_foot_L': 'lower_leg',
-    'ankle_foot_R': 'lower_leg',
+    # knee site is on lower_leg, ankle site on foot, foot site on toe, so the
+    # keypoint spans measure lower_leg and foot (NOT upper_leg/lower_leg). The
+    # femur (upper_leg = hip->knee) has no keypoint pair (no hip marker) and is
+    # therefore unmeasurable -> left to scale with the global factor.
+    'knee_ankle_L': 'lower_leg',
+    'knee_ankle_R': 'lower_leg',
+    'ankle_foot_L': 'foot',
+    'ankle_foot_R': 'foot',
 }
 
 

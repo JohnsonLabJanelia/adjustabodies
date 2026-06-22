@@ -37,14 +37,17 @@ def build_mjx_scale_fn(m, segments, orig):
     gb_j = jnp.array(m.geom_bodyid)
     sb_j = jnp.array(m.site_bodyid)
     jb_j = jnp.array(m.jnt_bodyid)
+    parent_j = jnp.array(m.body_parentid)
 
     orig_j = {k: jnp.array(v) for k, v in orig.items()}
 
     def apply_scales(mx, global_scale, rel_scales, site_offsets):
         ss = global_scale * rel_scales
         bs = jnp.where(bts_j >= 0, ss[jnp.clip(bts_j, 0, n_seg - 1)], 1.0)
+        # body_pos spans the parent bone -> scales with the parent's factor.
+        bs_parent = bs[parent_j]
         return mx.replace(
-            body_pos=orig_j['body_pos'] * bs[:, None],
+            body_pos=orig_j['body_pos'] * bs_parent[:, None],
             body_ipos=orig_j['body_ipos'] * bs[:, None],
             geom_pos=orig_j['geom_pos'] * bs[gb_j][:, None],
             geom_size=orig_j['geom_size'] * bs[gb_j][:, None],
@@ -61,8 +64,13 @@ def run_resize_phase(m, mx_base, segments, site_ids, orig,
                       n_rounds=6, m_iters=300, ik_iters=1000,
                       lr_scale=0.003, reg_scale=0.001,
                       segment_targets=None, segment_target_weight=1.0,
+                      freeze_rel=None,
                       verbose=True):
     """Phase 1: Optimize segment scales (no site offsets).
+
+    freeze_rel: optional bool array [n_seg]; True entries hold rel_scale==1.0
+        (segment scales only with the global factor). Use to pin segments that
+        no keypoint pair can measure (scapula, neck, pelvis, hand, foot).
 
     Returns: (global_scale, rel_scales, pre_residual, post_residual)
     """
@@ -72,9 +80,13 @@ def run_resize_phase(m, mx_base, segments, site_ids, orig,
     nsite = m.nsite
 
     si_j = jnp.array(site_ids)
+    freeze_j = None if freeze_rel is None else jnp.array(np.asarray(freeze_rel, bool))
 
     if init_rel_scales is None:
         init_rel_scales = np.ones(n_seg, dtype=np.float32)
+    if freeze_rel is not None:
+        init_rel_scales = init_rel_scales.copy()
+        init_rel_scales[np.asarray(freeze_rel, bool)] = 1.0
 
     params = {
         'global_scale': jnp.array(float(init_global)),
@@ -140,6 +152,8 @@ def run_resize_phase(m, mx_base, segments, site_ids, orig,
         new_params = optax.apply_updates(params, updates)
         new_params['global_scale'] = jnp.clip(new_params['global_scale'], 0.7, 1.5)
         new_params['rel_scales'] = jnp.clip(new_params['rel_scales'], 0.5, 1.5)
+        if freeze_j is not None:
+            new_params['rel_scales'] = jnp.where(freeze_j, 1.0, new_params['rel_scales'])
         return new_params, new_opt, loss, metrics
 
     # Compile

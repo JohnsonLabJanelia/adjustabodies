@@ -71,7 +71,7 @@ $$L = L_{\text{IK}} + \lambda_{\text{reg}} \sum_i (s_i - 1)^2 + \lambda_{\text{t
 
 where $s_i^{\text{abs}} = s_{\text{global}} \times s_i^{\text{rel}}$ is the absolute scale for segment $i$, and $\lambda_{\text{target}} = 0.05$ balances anatomical priors against IK fit quality. The regularization term ($\lambda_{\text{reg}} = 0.001$) penalizes deviation from unit scale, and the target term pulls measured segments toward their data-driven ratios.
 
-**Output**: Scaled body model with modified body_pos, body_ipos, geom_pos, geom_size, site_pos, and jnt_pos arrays.
+**Output**: Scaled body model with modified body_pos, body_ipos, geom_pos, geom_size, site_pos, and jnt_pos arrays. Note that `body_pos[bid]` (a child body's frame origin expressed in its parent frame) spans the *parent* bone, so it is scaled by the **parent** segment's factor; all other arrays live in the body's own frame and use the body's own factor. Scaling `body_pos` by the child's factor would push attach points off the parent body at segment boundaries.
 
 ### Phase 2: STAC Site Offset Calibration
 
