@@ -77,7 +77,7 @@ where $s_i^{\text{abs}} = s_{\text{global}} \times s_i^{\text{rel}}$ is the abso
 
 **Goal**: Fine-tune the positions where keypoint tracking labels attach to each bone, compensating for systematic offsets between the model's anatomical landmarks and the tracking system's label placement.
 
-**Parameters**: 43 x 3 = 129 site offset parameters (with L/R symmetry enforcement reducing effective DOF to ~72)
+**Parameters**: The site-offset array spans all 43 model sites, but only the 24 tracked keypoint sites enter the loss; the 19 non-keypoint anatomical landmarks have no keypoint target and are held at ~0 by regularization. The calibrated free parameters are therefore 24 x 3 = 72 offsets, further reduced by L/R symmetry enforcement.
 
 **Key constraint**: Segment scales are completely frozen in Phase 2 (zero gradient via `optax.set_to_zero()`). Only site offsets are optimized.
 

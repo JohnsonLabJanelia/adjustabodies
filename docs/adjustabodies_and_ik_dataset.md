@@ -70,9 +70,12 @@ arena mm into MuJoCo meters) and runs an alternating optimization: a CPU IK
   keypoint FK error + unit-scale regularization + a soft pull toward the Phase-0
   measured ratios.
 
-- **Phase 2 — STAC site calibration** (`stac.py`): **129 site-offset parameters**
-  (43 sites × 3, reduced to ~72 effective DOF by enforced L/R symmetry). Adjusts
-  *where* each tracking label attaches to its bone. **Segment scales are frozen
+- **Phase 2 — STAC site calibration** (`stac.py`): adjusts *where* each tracking
+  keypoint attaches to its bone. The offset array nominally spans all 43 model
+  sites, but only the **24 tracked keypoint sites** enter the loss — the 19
+  non-keypoint anatomical landmarks have no keypoint target and are held at ~0 by
+  regularization. So the calibrated free parameters are **24 keypoints × 3 = 72
+  offsets**, further reduced by enforced L/R symmetry. **Segment scales are frozen
   here** (`optax.set_to_zero()`) — an early version let the optimizer cheat by
   inflating global scale ~10% to shrink offset magnitudes.
 
