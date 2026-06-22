@@ -234,10 +234,12 @@ the per-animal jobs exceeded the cluster runtime limit.
   stall a joint exactly at its bound and zero its gradient. A soft limit penalty
   (`solreflimit`-style spring, already defined in the XML defaults) inside the loss would
   let joints approach limits smoothly instead of sticking.
-- **The 24-keypoint set under-constrains some DOF.** The tail (24 DOF) and the
-  shoulder-internal-rotation joints (`shoulder_sup_*`) have few or no dedicated keypoints,
-  so their solved angles are weakly identified. More tracked points, or a stronger pose
-  prior on those chains, would make those columns trustworthy.
+- **The 24-keypoint set under-constrains some DOF.** The tail carries **24 DOF but only
+  5 keypoints** (`tailbase` + `tail1Q/tailmid/tail3Q/tailtip`), so the inter-vertebral
+  angles are largely interpolated. And while each forelimb *has* a `shoulder` keypoint,
+  the axial-rotation DOF (`shoulder_sup_*`) is geometrically near-unobservable from a
+  single point on the limb, so those columns are weakly identified. More tracked points,
+  or a stronger pose prior on those chains, would make them trustworthy.
 - **GPU solver is validated but unused for the export.** The export ran on CPU; the MJX
   solver (change 2) reproduces it to <2 mm and could cut wall-clock substantially if the
   per-frame warm-start dependency were restructured into batched blocks.
