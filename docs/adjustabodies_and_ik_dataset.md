@@ -172,6 +172,76 @@ also exists alongside the per-rat directory.)
 - Run per-animal on LSF (~4,000–4,800 s/rat); a single combined job exceeded the
   runtime limit, hence the per-rat split.
 
+### Changes from the baseline RED IK solver
+
+The CPU solver is a Python port of **RED's `mujoco_ik.h`** (momentum gradient descent
+on site Jacobians) — the algorithm the lab used before. Three changes were needed to
+get from that baseline to a clean whole-dataset solve. Joint *limits* themselves were
+also changed once, at the model level.
+
+**0. Data-driven joint limits (model, not solver).** The base model
+`rodent_data_driven_limits.xml` replaces the dm_control rodent's default joint ranges
+with empirical limits — **99th percentile of each joint's observed excursion + 20%
+margin**. *Why:* the default ranges are loose enough to admit anatomically impossible
+poses that still fit the keypoints, so the IK can wander into implausible local minima.
+The data-driven ranges (e.g. spine joints at ±0.5236 rad) keep the solve in the region
+the animals actually occupy. These limits are **global** — shared by all 5 per-rat
+models. Per-rat fitting scales `jnt_pos` (joint anchor positions) but never `jnt_range`,
+so no joint's limits were retuned per-animal or for the full-dataset pass.
+
+**1. Joint-limit clamping restored in the CPU solver** (`ik_cpu.py:60-67`, commit
+`59f40ac`). The Python port had dropped the post-integration clamp present in the C++
+(`mujoco_ik.h` lines 243-249). *Why it mattered:* without it, joints integrated straight
+past their limits — the commit records the spine reaching **−6.9 rad against a ±0.5
+limit** — producing garbage qpos and a diffuse, uninterpretable UMAP. The fix clamps
+every limited hinge/slide joint to its range after each `mj_integratePos` step. Note the
+data-driven limits of change 0 only actually *bind* because of this clamp; the two go
+together.
+
+**2. MJX velocity-space gradient descent** (`ik_mjx.py`, commit `97b450f`). The GPU
+solver's first implementation did gradient descent directly on the 4 raw quaternion
+components of the free joint, which is wrong on the rotation manifold (the quaternion
+drifts off the unit sphere and the renormalization corrupts the gradient) and gave
+**27 mm residuals**. *Fix:* take gradients with respect to velocity-space (nv-dim)
+perturbations that flow through a JAX exponential-map implementation of
+`mj_integratePos`, so updates stay on the manifold. Validated against the CPU solver at
+cosine similarity 0.9998 and <2 mm residual difference.
+
+**3. Warm-starting for the whole-dataset run** (`batch_ik_cpu_trial`, commits `cbbbf08`
+/ `8cbf6db`). This is the only change specific to scaling up from fitting (500 sampled
+frames) to the 2.5M-frame export. During fitting every frame is solved cold (1000
+iters). For the export, only frame 0 of each trial is cold (1000 iters); each subsequent
+frame warm-starts from the previous frame's solution with **200 iters, lr 0.01, and
+momentum carried across frames** (`batch_ik_warmstart.py:109`). *Why:* consecutive
+180 fps frames are nearly identical, so a warm start converges in a fraction of the
+iterations and the carried state yields temporally smoother trajectories — without it
+the per-animal jobs exceeded the cluster runtime limit.
+
+#### Room for further improvement
+
+- **Residuals are still ~7–9 mm median** in the export (vs ~2.8 mm on the 500-frame fits
+  used for model fitting). The gap is partly the warm-start iteration budget (200 vs
+  1000) and partly that the fit frames were quality-filtered while the export solves every
+  frame, including poorly-tracked ones. An adaptive iteration count (more iters when the
+  per-frame residual stays high) would recover accuracy on the hard frames without paying
+  for it everywhere.
+- **No temporal smoothness term.** Each frame is solved independently (warm-start only
+  seeds the optimizer; it doesn't penalize frame-to-frame jerk). Adding a velocity/
+  acceleration regularizer — or a light forward–backward pass — would suppress residual
+  per-frame jitter that currently has to be band-pass filtered out downstream
+  (`02_limb_phase_pca.py`).
+- **Hard joint clamping is non-smooth.** Clamping projects onto the limit box, which can
+  stall a joint exactly at its bound and zero its gradient. A soft limit penalty
+  (`solreflimit`-style spring, already defined in the XML defaults) inside the loss would
+  let joints approach limits smoothly instead of sticking.
+- **The 24-keypoint set under-constrains some DOF.** The tail (24 DOF) and the
+  shoulder-internal-rotation joints (`shoulder_sup_*`) have few or no dedicated keypoints,
+  so their solved angles are weakly identified. More tracked points, or a stronger pose
+  prior on those chains, would make those columns trustworthy.
+- **GPU solver is validated but unused for the export.** The export ran on CPU; the MJX
+  solver (change 2) reproduces it to <2 mm and could cut wall-clock substantially if the
+  per-frame warm-start dependency were restructured into batched blocks.
+
 ### How it is consumed (yellow `scripts/gait_ik/`)
 
 The raw PRFS CSVs are touched **only** by staging scripts, which write compact local
