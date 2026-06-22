@@ -41,6 +41,11 @@ frames = io.load_keypoints3d("project/labeled_data/.../keypoints3d.csv", arena_t
 all_qpos = ik_cpu.batch_ik_cpu(m, frames, site_ids, max_iters=1000)
 ```
 
+## Documentation
+
+- [Adjustabodies algorithm](docs/adjustabodies_algorithm.md) — authoritative writeup of the two-phase fitting pipeline (segment scaling + STAC calibration), with per-rat results and design rationale.
+- [Adjustabodies and the IK dataset](docs/adjustabodies_and_ik_dataset.md) — short overview of the fitter plus the per-rat 68-DOF qpos_v4 IK dataset it produces and how it is consumed downstream.
+
 ## Used by
 
 - **[RED](https://github.com/JohnsonLabJanelia/red)** — GPU-accelerated 3D multi-camera keypoint labeling
